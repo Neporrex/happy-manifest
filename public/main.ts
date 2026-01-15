@@ -1,5 +1,5 @@
 // Constants and Interfaces
-const API_URL = '/api';
+const API_URL = 'fastapi-production-bca7.up.railway.app';
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 interface User {
