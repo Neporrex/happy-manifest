@@ -1,7 +1,7 @@
-// Constants and Interfaces
-const API_URL = 'fastapi-production-bca7.up.railway.app';
-const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+// Constants
+const API_URL = 'https://fastapi-production-bca7.up.railway.app';
 
+// Interfaces
 interface User {
     id: string;
     username: string;
@@ -24,568 +24,547 @@ interface Channel {
     id: string;
     name: string;
     type: number;
-    position: number;
-    parent_id?: string;
 }
 
 interface GuildConfig {
     welcome_enabled: number;
-    welcome_channel_id: number | null;
+    welcome_channel_id: string | null;
     welcome_message: string;
     leave_enabled: number;
-    leave_channel_id: number | null;
+    leave_channel_id: string | null;
     log_enabled: number;
-    log_channel_id: number | null;
+    log_channel_id: string | null;
     ticket_enabled: number;
-    ticket_category_id: number | null;
+    ticket_category_id: string | null;
 }
 
-interface ConfigForm {
-    welcomeEnabled: boolean;
-    welcomeChannel: string;
-    welcomeMessage: string;
-    leaveEnabled: boolean;
-    leaveChannel: string;
-    logEnabled: boolean;
-    logChannel: string;
-    ticketEnabled: boolean;
-    ticketCategory: string;
-}
-
-// State Management
-class AppState {
-    private _token: string | null = null;
-    private _user: User | null = null;
-    private _guilds: Guild[] = [];
-    private _currentGuildId: string | null = null;
-    private _lastActivity: number = Date.now();
-    private _sessionTimer: number | null = null;
+// App State Manager
+class HappyBotApp {
+    private token: string | null = null;
+    private user: User | null = null;
+    private guilds: Guild[] = [];
+    private currentGuild: Guild | null = null;
+    private config: GuildConfig | null = null;
+    private channels: Channel[] = [];
 
     constructor() {
-        this.setupActivityListener();
+        this.init();
     }
 
-    get token(): string | null {
-        return this._token;
-    }
-
-    set token(value: string | null) {
-        this._token = value;
-        if (value) {
-            localStorage.setItem('discord_token', value);
-            this.resetSessionTimer();
+    // Initialize app
+    private async init(): Promise<void> {
+        console.log('Initializing Happy Bot App...');
+        
+        // Get token from URL or localStorage
+        this.token = this.getTokenFromURL() || localStorage.getItem('token');
+        
+        // Setup event listeners
+        this.setupEventListeners();
+        
+        // Check authentication
+        if (this.token) {
+            await this.loadUserData();
         } else {
-            localStorage.removeItem('discord_token');
-            this.clearSessionTimer();
+            this.showLoginScreen();
         }
     }
 
-    get user(): User | null {
-        return this._user;
-    }
-
-    set user(value: User | null) {
-        this._user = value;
-        this.updateUserUI();
-    }
-
-    get guilds(): Guild[] {
-        return this._guilds;
-    }
-
-    set guilds(value: Guild[]) {
-        this._guilds = value;
-        this.updateGuildsUI();
-    }
-
-    get currentGuildId(): string | null {
-        return this._currentGuildId;
-    }
-
-    set currentGuildId(value: string | null) {
-        this._currentGuildId = value;
-        if (value) {
-            localStorage.setItem('last_guild_id', value);
+    // Get token from URL query parameter
+    private getTokenFromURL(): string | null {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        
+        if (token) {
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            localStorage.setItem('token', token);
         }
+        
+        return token;
     }
 
-    private setupActivityListener(): void {
-        const activityEvents = ['mousemove', 'keypress', 'click', 'scroll'];
-        activityEvents.forEach(event => {
-            document.addEventListener(event, () => {
-                this._lastActivity = Date.now();
-            });
+    // Setup all event listeners
+    private setupEventListeners(): void {
+        // Login button
+        const loginBtn = document.getElementById('loginBtn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => this.login());
+        }
+
+        // Logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.logout());
+        }
+
+        // Guild selection
+        document.addEventListener('click', (e) => {
+            const guildCard = (e.target as HTMLElement).closest('.guild-card');
+            if (guildCard) {
+                const guildId = guildCard.getAttribute('data-guild-id');
+                if (guildId) {
+                    this.selectGuild(guildId);
+                }
+            }
         });
 
-        // Check session every minute
-        setInterval(() => this.checkSession(), 60 * 1000);
+        // Back to guilds button
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => this.showGuildsScreen());
+        }
+
+        // Save config button
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.saveConfig());
+        }
     }
 
-    private resetSessionTimer(): void {
-        this._lastActivity = Date.now();
-        this.clearSessionTimer();
+    // Discord OAuth2 login
+    private login(): void {
+        // Redirect to your backend's OAuth2 endpoint
+        window.location.href = `${API_URL}/api/auth/login`;
+    }
+
+    // Logout
+    private logout(): void {
+        this.token = null;
+        this.user = null;
+        this.guilds = [];
+        this.currentGuild = null;
+        this.config = null;
         
-        this._sessionTimer = window.setTimeout(() => {
-            if (Date.now() - this._lastActivity > SESSION_TIMEOUT) {
-                this.logout();
+        localStorage.removeItem('token');
+        localStorage.removeItem('lastGuildId');
+        
+        this.showLoginScreen();
+        this.showNotification('Logged out successfully', 'success');
+    }
+
+    // Show login screen
+    private showLoginScreen(): void {
+        this.showSection('loginSection');
+        this.hideSection('guildsSection');
+        this.hideSection('configSection');
+    }
+
+    // Show guilds screen
+    private showGuildsScreen(): void {
+        this.showSection('guildsSection');
+        this.hideSection('configSection');
+        this.renderGuilds();
+    }
+
+    // Show config screen
+    private showConfigScreen(): void {
+        this.showSection('configSection');
+        this.hideSection('guildsSection');
+    }
+
+    // Show/hide sections
+    private showSection(sectionId: string): void {
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.classList.remove('hidden');
+            section.classList.add('active');
+        }
+    }
+
+    private hideSection(sectionId: string): void {
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.classList.add('hidden');
+            section.classList.remove('active');
+        }
+    }
+
+    // Load user data
+    private async loadUserData(): Promise<void> {
+        try {
+            // Get user info
+            this.user = await this.fetchAPI<User>('/api/auth/me');
+            this.renderUserInfo();
+            
+            // Get user's guilds
+            this.guilds = await this.fetchAPI<Guild[]>('/api/auth/guilds');
+            this.showGuildsScreen();
+            
+            // Try to load last selected guild
+            const lastGuildId = localStorage.getItem('lastGuildId');
+            if (lastGuildId) {
+                const guild = this.guilds.find(g => g.id === lastGuildId);
+                if (guild) {
+                    await this.selectGuild(guild.id);
+                }
             }
-        }, SESSION_TIMEOUT);
-    }
-
-    private clearSessionTimer(): void {
-        if (this._sessionTimer) {
-            clearTimeout(this._sessionTimer);
-            this._sessionTimer = null;
+            
+        } catch (error) {
+            console.error('Failed to load user data:', error);
+            this.showNotification('Failed to load user data', 'error');
+            this.showLoginScreen();
         }
     }
 
-    private checkSession(): void {
-        if (this._token && Date.now() - this._lastActivity > SESSION_TIMEOUT) {
-            this.logout();
-        }
-    }
+    // Render user info
+    private renderUserInfo(): void {
+        if (!this.user) return;
 
-    private updateUserUI(): void {
-        const loginSection = document.getElementById('loginSection');
-        const userSection = document.getElementById('userSection');
-        
-        if (!this._user) {
-            loginSection?.classList.remove('hidden');
-            userSection?.classList.add('hidden');
-            return;
-        }
-
-        loginSection?.classList.add('hidden');
-        userSection?.classList.remove('hidden');
-
-        // Update user info
+        // Avatar
         const avatarEl = document.getElementById('userAvatar') as HTMLImageElement;
-        const nameEl = document.getElementById('userName');
-        const idEl = document.getElementById('userId');
-        const emailEl = document.getElementById('userEmail');
-
-        if (avatarEl && this._user.avatar) {
-            avatarEl.src = `https://cdn.discordapp.com/avatars/${this._user.id}/${this._user.avatar}.png`;
+        if (avatarEl && this.user.avatar) {
+            avatarEl.src = `https://cdn.discordapp.com/avatars/${this.user.id}/${this.user.avatar}.png`;
             avatarEl.onerror = () => {
-                avatarEl.src = '/assets/default-avatar.png';
+                avatarEl.src = 'https://cdn.discordapp.com/embed/avatars/0.png';
             };
         }
 
-        if (nameEl) {
-            nameEl.textContent = this._user.global_name || this._user.username;
+        // Username
+        const usernameEl = document.getElementById('userName');
+        if (usernameEl) {
+            usernameEl.textContent = this.user.global_name || this.user.username;
         }
 
-        if (idEl) {
-            idEl.textContent = this._user.discriminator !== '0' 
-                ? `#${this._user.discriminator}` 
-                : `@${this._user.username}`;
-        }
-
-        if (emailEl && this._user.email) {
-            emailEl.textContent = this._user.email;
-            emailEl.parentElement?.classList.remove('hidden');
+        // Tag
+        const tagEl = document.getElementById('userTag');
+        if (tagEl) {
+            tagEl.textContent = this.user.discriminator === '0' 
+                ? `@${this.user.username}`
+                : `${this.user.username}#${this.user.discriminator}`;
         }
     }
 
-    private updateGuildsUI(): void {
+    // Render guilds list
+    private renderGuilds(): void {
         const guildsList = document.getElementById('guildsList');
         if (!guildsList) return;
 
-        guildsList.innerHTML = '';
-
-        if (this._guilds.length === 0) {
+        if (this.guilds.length === 0) {
             guildsList.innerHTML = `
-                <div class="empty-state">
+                <div class="no-guilds">
                     <p>No servers available</p>
-                    <p class="text-sm text-gray-400">Make sure the bot is added to your servers</p>
+                    <p class="text-sm">Make sure the bot is added to your servers</p>
                 </div>
             `;
             return;
         }
 
-        this._guilds.forEach(guild => {
-            const card = document.createElement('div');
-            card.className = 'guild-card group hover-lift';
-            card.setAttribute('data-guild-id', guild.id);
-            
-            card.innerHTML = `
-                <div class="guild-header">
+        guildsList.innerHTML = this.guilds.map(guild => `
+            <div class="guild-card" data-guild-id="${guild.id}">
+                <div class="guild-icon">
                     ${guild.icon 
                         ? `<img src="https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png" 
-                             class="guild-icon rounded-xl"
                              alt="${guild.name}"
-                             onerror="this.onerror=null; this.src='/assets/default-server.png'">` 
-                        : `<div class="guild-icon bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
-                              <span class="text-lg font-bold">${guild.name.charAt(0)}</span>
-                           </div>`
+                             onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">`
+                        : `<div class="guild-icon-fallback">${guild.name.charAt(0)}</div>`
                     }
-                    <div class="flex-1 min-w-0">
-                        <h3 class="truncate font-semibold">${guild.name}</h3>
-                        <div class="flex items-center gap-2 mt-1">
-                            ${guild.owner 
-                                ? `<span class="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Owner</span>` 
-                                : ''
-                            }
-                            ${guild.permissions.includes('8') 
-                                ? `<span class="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">Admin</span>` 
-                                : ''
-                            }
-                        </div>
-                    </div>
-                    <svg class="w-5 h-5 text-gray-400 group-hover:text-purple-400 transition-colors" 
-                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
                 </div>
-            `;
-
-            card.addEventListener('click', () => this.loadGuildConfig(guild.id, guild.name));
-            guildsList.appendChild(card);
-        });
-
-        // Load last selected guild
-        const lastGuildId = localStorage.getItem('last_guild_id');
-        if (lastGuildId && this._guilds.some(g => g.id === lastGuildId)) {
-            const guild = this._guilds.find(g => g.id === lastGuildId);
-            if (guild) {
-                this.loadGuildConfig(guild.id, guild.name);
-            }
-        }
+                <div class="guild-info">
+                    <h3 class="guild-name">${guild.name}</h3>
+                    <div class="guild-badges">
+                        ${guild.owner ? '<span class="badge owner">Owner</span>' : ''}
+                        ${guild.permissions.includes('8') ? '<span class="badge admin">Admin</span>' : ''}
+                    </div>
+                </div>
+                <div class="guild-arrow">→</div>
+            </div>
+        `).join('');
     }
 
-    private async loadGuildConfig(guildId: string, guildName: string): Promise<void> {
-        this.currentGuildId = guildId;
-        
-        const guildNameEl = document.getElementById('guildName');
-        if (guildNameEl) {
-            guildNameEl.textContent = guildName;
+    // Select a guild
+    private async selectGuild(guildId: string): Promise<void> {
+        const guild = this.guilds.find(g => g.id === guildId);
+        if (!guild) return;
+
+        this.currentGuild = guild;
+        localStorage.setItem('lastGuildId', guildId);
+
+        // Show loading
+        this.showConfigScreen();
+        const configSection = document.getElementById('configSection');
+        if (configSection) {
+            configSection.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading ${guild.name} configuration...</p>
+                </div>
+            `;
         }
 
-        this.showSection('configSection');
-        
         try {
-            const [config, channels] = await Promise.all([
+            // Load guild config and channels
+            [this.config, this.channels] = await Promise.all([
                 this.fetchAPI<GuildConfig>(`/api/config/${guildId}`),
                 this.fetchAPI<Channel[]>(`/api/guilds/${guildId}/channels`)
             ]);
 
-            const textChannels = channels.filter(ch => ch.type === 0);
-            const categories = channels.filter(ch => ch.type === 4);
+            this.renderConfigForm();
+            this.showNotification(`Loaded ${guild.name} configuration`, 'success');
 
-            this.populateSelect('welcomeChannel', textChannels, config.welcome_channel_id);
-            this.populateSelect('leaveChannel', textChannels, config.leave_channel_id);
-            this.populateSelect('logChannel', textChannels, config.log_channel_id);
-            this.populateSelect('ticketCategory', categories, config.ticket_category_id);
-
-            const form: ConfigForm = {
-                welcomeEnabled: config.welcome_enabled === 1,
-                welcomeChannel: config.welcome_channel_id?.toString() || '',
-                welcomeMessage: config.welcome_message || '',
-                leaveEnabled: config.leave_enabled === 1,
-                leaveChannel: config.leave_channel_id?.toString() || '',
-                logEnabled: config.log_enabled === 1,
-                logChannel: config.log_channel_id?.toString() || '',
-                ticketEnabled: config.ticket_enabled === 1,
-                ticketCategory: config.ticket_category_id?.toString() || ''
-            };
-
-            this.setFormValues(form);
-            
-            // Show success notification
-            this.showNotification('Configuration loaded successfully', 'success');
         } catch (error) {
             console.error('Failed to load guild config:', error);
             this.showNotification('Failed to load configuration', 'error');
+            this.showGuildsScreen();
         }
     }
 
-    private populateSelect(selectId: string, items: Channel[], selectedId: number | null): void {
-        const select = document.getElementById(selectId) as HTMLSelectElement;
-        if (!select) return;
+    // Render configuration form
+    private renderConfigForm(): void {
+        if (!this.currentGuild || !this.config) return;
+
+        const configSection = document.getElementById('configSection');
+        if (!configSection) return;
+
+        const textChannels = this.channels.filter(c => c.type === 0); // GUILD_TEXT
+        const categories = this.channels.filter(c => c.type === 4); // GUILD_CATEGORY
+
+        configSection.innerHTML = `
+            <div class="config-header">
+                <button id="backBtn" class="back-btn">← Back</button>
+                <h2>${this.currentGuild.name} Configuration</h2>
+            </div>
+
+            <div class="config-form">
+                <!-- Welcome Settings -->
+                <div class="config-section">
+                    <h3>Welcome Settings</h3>
+                    <div class="toggle-group">
+                        <label class="toggle">
+                            <input type="checkbox" id="welcomeEnabled" ${this.config.welcome_enabled ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                            Enable Welcome Messages
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeChannel">Welcome Channel</label>
+                        <select id="welcomeChannel" ${!this.config.welcome_enabled ? 'disabled' : ''}>
+                            <option value="">Select a channel...</option>
+                            ${textChannels.map(ch => `
+                                <option value="${ch.id}" ${ch.id === this.config!.welcome_channel_id ? 'selected' : ''}>
+                                    #${ch.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="welcomeMessage">Welcome Message</label>
+                        <textarea id="welcomeMessage" rows="3" 
+                                  ${!this.config.welcome_enabled ? 'disabled' : ''}
+                                  placeholder="Welcome {user} to {server}!">${this.config.welcome_message || ''}</textarea>
+                        <small>Available variables: {user}, {server}, {member_count}</small>
+                    </div>
+                </div>
+
+                <!-- Leave Settings -->
+                <div class="config-section">
+                    <h3>Leave Settings</h3>
+                    <div class="toggle-group">
+                        <label class="toggle">
+                            <input type="checkbox" id="leaveEnabled" ${this.config.leave_enabled ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                            Enable Leave Messages
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="leaveChannel">Leave Channel</label>
+                        <select id="leaveChannel" ${!this.config.leave_enabled ? 'disabled' : ''}>
+                            <option value="">Select a channel...</option>
+                            ${textChannels.map(ch => `
+                                <option value="${ch.id}" ${ch.id === this.config!.leave_channel_id ? 'selected' : ''}>
+                                    #${ch.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Log Settings -->
+                <div class="config-section">
+                    <h3>Log Settings</h3>
+                    <div class="toggle-group">
+                        <label class="toggle">
+                            <input type="checkbox" id="logEnabled" ${this.config.log_enabled ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                            Enable Logging
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="logChannel">Log Channel</label>
+                        <select id="logChannel" ${!this.config.log_enabled ? 'disabled' : ''}>
+                            <option value="">Select a channel...</option>
+                            ${textChannels.map(ch => `
+                                <option value="${ch.id}" ${ch.id === this.config!.log_channel_id ? 'selected' : ''}>
+                                    #${ch.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Ticket Settings -->
+                <div class="config-section">
+                    <h3>Ticket Settings</h3>
+                    <div class="toggle-group">
+                        <label class="toggle">
+                            <input type="checkbox" id="ticketEnabled" ${this.config.ticket_enabled ? 'checked' : ''}>
+                            <span class="toggle-slider"></span>
+                            Enable Tickets
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="ticketCategory">Ticket Category</label>
+                        <select id="ticketCategory" ${!this.config.ticket_enabled ? 'disabled' : ''}>
+                            <option value="">Select a category...</option>
+                            ${categories.map(cat => `
+                                <option value="${cat.id}" ${cat.id === this.config!.ticket_category_id ? 'selected' : ''}>
+                                    📁 ${cat.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Save Button -->
+                <div class="form-actions">
+                    <button id="saveBtn" class="save-btn">
+                        Save Configuration
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Enable/disable form fields based on toggles
+        this.setupFormToggles();
+    }
+
+    // Setup form toggle interactions
+    private setupFormToggles(): void {
+        const toggles = ['welcomeEnabled', 'leaveEnabled', 'logEnabled', 'ticketEnabled'];
         
-        select.innerHTML = '<option value="">Select...</option>';
-        
-        items.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.id;
-            option.textContent = item.type === 4 ? `📁 ${item.name}` : `# ${item.name}`;
-            if (item.id === String(selectedId)) {
-                option.selected = true;
+        toggles.forEach(toggleId => {
+            const toggle = document.getElementById(toggleId) as HTMLInputElement;
+            if (toggle) {
+                toggle.addEventListener('change', (e) => {
+                    const target = e.target as HTMLInputElement;
+                    const section = target.id.replace('Enabled', '');
+                    
+                    // Enable/disable related fields
+                    const relatedFields = document.querySelectorAll(`[id^="${section}"]:not(#${toggleId})`);
+                    relatedFields.forEach(field => {
+                        (field as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).disabled = !target.checked;
+                    });
+                });
             }
-            select.appendChild(option);
         });
     }
 
-    private setFormValues(form: ConfigForm): void {
-        (document.getElementById('welcomeEnabled') as HTMLInputElement).checked = form.welcomeEnabled;
-        (document.getElementById('welcomeChannel') as HTMLSelectElement).value = form.welcomeChannel;
-        (document.getElementById('welcomeMessage') as HTMLTextAreaElement).value = form.welcomeMessage;
-        (document.getElementById('leaveEnabled') as HTMLInputElement).checked = form.leaveEnabled;
-        (document.getElementById('leaveChannel') as HTMLSelectElement).value = form.leaveChannel;
-        (document.getElementById('logEnabled') as HTMLInputElement).checked = form.logEnabled;
-        (document.getElementById('logChannel') as HTMLSelectElement).value = form.logChannel;
-        (document.getElementById('ticketEnabled') as HTMLInputElement).checked = form.ticketEnabled;
-        (document.getElementById('ticketCategory') as HTMLSelectElement).value = form.ticketCategory;
-    }
+    // Save configuration
+    private async saveConfig(): Promise<void> {
+        if (!this.currentGuild || !this.config) return;
 
-    private getFormValues(): ConfigForm {
-        return {
-            welcomeEnabled: (document.getElementById('welcomeEnabled') as HTMLInputElement).checked,
-            welcomeChannel: (document.getElementById('welcomeChannel') as HTMLSelectElement).value,
-            welcomeMessage: (document.getElementById('welcomeMessage') as HTMLTextAreaElement).value,
-            leaveEnabled: (document.getElementById('leaveEnabled') as HTMLInputElement).checked,
-            leaveChannel: (document.getElementById('leaveChannel') as HTMLSelectElement).value,
-            logEnabled: (document.getElementById('logEnabled') as HTMLInputElement).checked,
-            logChannel: (document.getElementById('logChannel') as HTMLSelectElement).value,
-            ticketEnabled: (document.getElementById('ticketEnabled') as HTMLInputElement).checked,
-            ticketCategory: (document.getElementById('ticketCategory') as HTMLSelectElement).value
-        };
-    }
-
-    async fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-        const headers: HeadersInit = {
-            'Content-Type': 'application/json',
-            ...(this._token ? { 'Authorization': `Bearer ${this._token}` } : {}),
-            ...options.headers,
-        };
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
+        const saveBtn = document.getElementById('saveBtn') as HTMLButtonElement;
+        const originalText = saveBtn.innerHTML;
+        
         try {
-            const response = await fetch(`${API_URL}${endpoint}`, {
-                ...options,
-                headers,
-                signal: controller.signal
+            // Show loading
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<div class="spinner small"></div> Saving...';
+
+            // Get form values
+            const updatedConfig: GuildConfig = {
+                welcome_enabled: (document.getElementById('welcomeEnabled') as HTMLInputElement).checked ? 1 : 0,
+                welcome_channel_id: (document.getElementById('welcomeChannel') as HTMLSelectElement).value || null,
+                welcome_message: (document.getElementById('welcomeMessage') as HTMLTextAreaElement).value,
+                leave_enabled: (document.getElementById('leaveEnabled') as HTMLInputElement).checked ? 1 : 0,
+                leave_channel_id: (document.getElementById('leaveChannel') as HTMLSelectElement).value || null,
+                log_enabled: (document.getElementById('logEnabled') as HTMLInputElement).checked ? 1 : 0,
+                log_channel_id: (document.getElementById('logChannel') as HTMLSelectElement).value || null,
+                ticket_enabled: (document.getElementById('ticketEnabled') as HTMLInputElement).checked ? 1 : 0,
+                ticket_category_id: (document.getElementById('ticketCategory') as HTMLSelectElement).value || null,
+            };
+
+            // Send update
+            await this.fetchAPI(`/api/config/${this.currentGuild.id}`, {
+                method: 'POST',
+                body: JSON.stringify(updatedConfig),
             });
 
-            clearTimeout(timeoutId);
+            this.config = updatedConfig;
+            this.showNotification('Configuration saved successfully!', 'success');
+
+        } catch (error) {
+            console.error('Failed to save config:', error);
+            this.showNotification('Failed to save configuration', 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        }
+    }
+
+    // Generic fetch API helper
+    private async fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+        const url = endpoint.startsWith('http') ? endpoint : `${API_URL}${endpoint}`;
+        
+        const headers: HeadersInit = {
+            'Content-Type': 'application/json',
+            ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {}),
+            ...options?.headers,
+        };
+
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers,
+                credentials: 'include',
+            });
 
             if (!response.ok) {
                 if (response.status === 401) {
                     this.logout();
                     throw new Error('Session expired. Please login again.');
                 }
-                if (response.status === 403) {
-                    throw new Error('You don\'t have permission to access this resource.');
-                }
-                if (response.status === 404) {
-                    throw new Error('Resource not found.');
-                }
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                throw new Error(`API Error: ${response.status}`);
             }
 
             return await response.json();
         } catch (error) {
-            clearTimeout(timeoutId);
-            if (error instanceof Error) {
-                if (error.name === 'AbortError') {
-                    throw new Error('Request timeout. Please try again.');
-                }
-                throw error;
-            }
-            throw new Error('Network error. Please check your connection.');
+            throw error instanceof Error ? error : new Error('Network error');
         }
     }
 
-    showSection(sectionId: string): void {
-        const sections = ['guildsSection', 'configSection'];
-        sections.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                if (id === sectionId) {
-                    element.classList.remove('hidden');
-                    element.classList.add('active');
-                } else {
-                    element.classList.add('hidden');
-                    element.classList.remove('active');
-                }
-            }
-        });
-    }
-
-    async loadUser(): Promise<void> {
-        try {
-            this.user = await this.fetchAPI<User>('/api/auth/me');
-            this.guilds = await this.fetchAPI<Guild[]>('/api/auth/guilds');
-        } catch (error) {
-            console.error('Failed to load user:', error);
-            this.user = null;
-            this.guilds = [];
-            this.showNotification(error instanceof Error ? error.message : 'Failed to load user data', 'error');
-        }
-    }
-
-    async saveConfig(): Promise<void> {
-        if (!this.currentGuildId) return;
-
-        const form = this.getFormValues();
-        const config: GuildConfig = {
-            welcome_enabled: form.welcomeEnabled ? 1 : 0,
-            welcome_channel_id: form.welcomeChannel ? parseInt(form.welcomeChannel) : null,
-            welcome_message: form.welcomeMessage,
-            leave_enabled: form.leaveEnabled ? 1 : 0,
-            leave_channel_id: form.leaveChannel ? parseInt(form.leaveChannel) : null,
-            log_enabled: form.logEnabled ? 1 : 0,
-            log_channel_id: form.logChannel ? parseInt(form.logChannel) : null,
-            ticket_enabled: form.ticketEnabled ? 1 : 0,
-            ticket_category_id: form.ticketCategory ? parseInt(form.ticketCategory) : null,
-        };
-
-        const saveButton = document.getElementById('saveButton') as HTMLButtonElement;
-        const originalText = saveButton.textContent;
-        
-        try {
-            saveButton.disabled = true;
-            saveButton.innerHTML = '<span class="loading-spinner"></span>Saving...';
-            
-            await this.fetchAPI(`/api/config/${this.currentGuildId}`, {
-                method: 'POST',
-                body: JSON.stringify(config),
-            });
-
-            this.showNotification('Configuration saved successfully!', 'success');
-            
-            // Auto-save indicator
-            const indicator = document.createElement('div');
-            indicator.className = 'save-indicator';
-            indicator.textContent = 'Saved';
-            saveButton.appendChild(indicator);
-            
-            setTimeout(() => {
-                indicator.remove();
-            }, 2000);
-        } catch (error) {
-            console.error('Failed to save config:', error);
-            this.showNotification(error instanceof Error ? error.message : 'Failed to save configuration', 'error');
-        } finally {
-            saveButton.disabled = false;
-            saveButton.textContent = originalText;
-        }
-    }
-
-    logout(): void {
-        this.token = null;
-        this.user = null;
-        this.guilds = [];
-        this.currentGuildId = null;
-        localStorage.removeItem('discord_token');
-        localStorage.removeItem('last_guild_id');
-        
-        // Clear URL token if present
-        const url = new URL(window.location.href);
-        url.searchParams.delete('token');
-        window.history.replaceState({}, document.title, url.pathname);
-        
-        this.showSection('loginSection');
-        this.showNotification('Logged out successfully', 'info');
-    }
-
-    showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
+    // Show notification
+    private showNotification(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
         // Remove existing notifications
         const existing = document.querySelectorAll('.notification');
-        existing.forEach(el => el.remove());
+        existing.forEach(n => n.remove());
 
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
         notification.innerHTML = `
             <span>${message}</span>
-            <button class="notification-close">×</button>
+            <button class="close-btn">×</button>
         `;
 
         document.body.appendChild(notification);
 
-        // Auto-remove after 5 seconds
+        // Auto remove after 5 seconds
         setTimeout(() => {
-            notification.classList.add('notification-hide');
+            notification.classList.add('fade-out');
             setTimeout(() => notification.remove(), 300);
         }, 5000);
 
         // Close button
-        notification.querySelector('.notification-close')?.addEventListener('click', () => {
-            notification.classList.add('notification-hide');
+        notification.querySelector('.close-btn')?.addEventListener('click', () => {
+            notification.classList.add('fade-out');
             setTimeout(() => notification.remove(), 300);
-        });
-    }
-
-    getTokenFromURL(): string | null {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('token');
-    }
-
-    initialize(): void {
-        // Get token from URL or localStorage
-        const urlToken = this.getTokenFromURL();
-        if (urlToken) {
-            this.token = urlToken;
-            // Clean URL
-            const url = new URL(window.location.href);
-            url.searchParams.delete('token');
-            window.history.replaceState({}, document.title, url.pathname);
-        } else {
-            this.token = localStorage.getItem('discord_token');
-        }
-
-        // Set up event listeners
-        this.setupEventListeners();
-
-        // Load user if token exists
-        if (this.token) {
-            this.loadUser();
-        } else {
-            this.showSection('loginSection');
-        }
-    }
-
-    private setupEventListeners(): void {
-        // Back button
-        const backButton = document.getElementById('backButton');
-        if (backButton) {
-            backButton.addEventListener('click', () => this.showSection('guildsSection'));
-        }
-
-        // Save button
-        const saveButton = document.getElementById('saveButton');
-        if (saveButton) {
-            saveButton.addEventListener('click', () => this.saveConfig());
-        }
-
-        // Logout button
-        const logoutButton = document.getElementById('logoutButton');
-        if (logoutButton) {
-            logoutButton.addEventListener('click', () => {
-                if (confirm('Are you sure you want to logout?')) {
-                    this.logout();
-                }
-            });
-        }
-
-        // Form validation
-        const formElements = document.querySelectorAll('input, select, textarea');
-        formElements.forEach(el => {
-            el.addEventListener('change', () => {
-                const saveButton = document.getElementById('saveButton');
-                if (saveButton) {
-                    saveButton.classList.add('unsaved');
-                }
-            });
-        });
-
-        // Auto-save on form submission (Ctrl+S or Cmd+S)
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                this.saveConfig();
-            }
         });
     }
 }
 
-// Initialize the application
+// Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    const app = new AppState();
-    app.initialize();
-
-    // Expose to window for debugging
-    (window as any).App = app;
+    const app = new HappyBotApp();
+    
+    // Expose app for debugging (optional)
+    (window as any).HappyBotApp = app;
 });
