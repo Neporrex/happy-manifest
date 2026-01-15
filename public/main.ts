@@ -1,5 +1,5 @@
 // Constants and Interfaces
-const API_URL = 'http://localhost:8000';
+const API_URL = '/api';
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
 interface User {
