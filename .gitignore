@@ -1,0 +1,19 @@
+# public/.gitignore (if you have a public folder)
+
+# Cache
+.cache/
+
+# Build files
+build/
+dist/
+
+# Development
+.dev/
+debug/
+
+# Uploads
+uploads/
+media/
+
+# User uploaded content
+user_content/

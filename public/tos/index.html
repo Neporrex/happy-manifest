@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service - Happy Manifests</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles matching main page */
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .animate-pulse-glow {
+            animation: pulse-glow 4s ease-in-out infinite;
+        }
+        
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #a855f7, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        
+        .hover-lift {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-3px);
+        }
+        
+        .glow-text {
+            text-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #a855f7, #3b82f6);
+            border-radius: 4px;
+        }
+        
+        /* Mouse glow effect */
+        .mouse-glow {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, rgba(59, 130, 246, 0.08) 40%, transparent 70%);
+            pointer-events: none;
+            z-index: 9999;
+            mix-blend-mode: screen;
+            filter: blur(12px);
+            transition: transform 0.1s ease-out;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            will-change: transform;
+        }
+        
+        .mouse-glow.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body class="bg-black text-white min-h-screen relative overflow-x-hidden selection:bg-purple-500/20 selection:text-white cursor-none">
+    <!-- Mouse Glow Effect -->
+    <div id="mouseGlow" class="mouse-glow"></div>
+    
+    <!-- Background Effects -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-60 -right-60 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-pulse-glow"></div>
+        <div class="absolute -bottom-60 -left-60 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px] animate-pulse-glow" style="animation-delay: 2s"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-gradient-to-r from-purple-500/5 via-transparent to-blue-500/5 rounded-full blur-[150px]"></div>
+        
+        <!-- Grid Pattern -->
+        <div class="absolute inset-0 opacity-[0.02]"
+             style="background-image: linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                     linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+                    background-size: 50px 50px;"></div>
+    </div>
+    
+    <!-- Back Button -->
+    <div class="fixed top-8 left-8 z-50">
+        <a href="/" 
+           class="group inline-flex items-center gap-2 px-6 py-3 rounded-full glass-card border border-white/10 hover:border-purple-500/30 hover-lift transition-all duration-300">
+            <svg class="w-5 h-5 group-hover:-translate-x-1 transition-transform" 
+                 fill="none" 
+                 stroke="currentColor" 
+                 viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+            <span class="font-medium bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">
+                Back to Home
+            </span>
+        </a>
+    </div>
+
+    <!-- Header -->
+    <header class="relative z-10 pt-20 pb-12 text-center">
+        <div class="max-w-4xl mx-auto px-4">
+            <div class="inline-flex items-center gap-3 mb-6">
+                <div class="relative">
+                    <div class="absolute inset-0 bg-purple-500/20 blur-lg rounded-full"></div>
+                    <img src="../assets/mascot.png" class="w-10 h-10 relative z-10 rounded-full border border-white/10 shadow-lg">
+                </div>
+                <span class="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+                    Happy Manifests
+                </span>
+            </div>
+            
+            <h1 class="text-5xl md:text-7xl font-black tracking-tighter mb-6">
+                <span class="gradient-text">Terms of</span>
+                <span class="text-white glow-text block mt-2">Service</span>
+            </h1>
+            
+            <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                Last updated: <span class="text-purple-400">January 14, 2026</span>
+            </p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="relative z-10 max-w-4xl mx-auto px-4 pb-20">
+        <!-- Legal Card -->
+        <div class="glass-card rounded-3xl p-8 md:p-12 border-2 border-white/10 hover:border-purple-500/20 transition-all duration-500 hover-lift group">
+            <!-- Animated Border Effect -->
+            <div class="absolute inset-0 rounded-3xl bg-gradient-to-r from-purple-500/0 via-purple-500/5 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            
+            <!-- Content -->
+            <div class="relative space-y-8">
+                <!-- Section 1 -->
+                <div class="group/section">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                            <span class="text-xl font-bold text-purple-400">1</span>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-1">Acceptance of Terms</h2>
+                    </div>
+                    <div class="ml-14">
+                        <p class="text-gray-300 leading-relaxed">
+                            By accessing or using Happy Manifests ("the Service"), you agree to be bound by these
+                            Terms of Service. If you do not agree, you may not use the Service.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 2 -->
+                <div class="group/section">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                            <span class="text-xl font-bold text-purple-400">2</span>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-1">Description of Service</h2>
+                    </div>
+                    <div class="ml-14">
+                        <p class="text-gray-300 leading-relaxed">
+                            Happy Manifests provides a Discord-based platform including a bot and web dashboard
+                            that allows users to manage features, automation, and server-related tools.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 3 -->
+                <div class="group/section">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                            <span class="text-xl font-bold text-purple-400">3</span>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-1">User Responsibilities</h2>
+                    </div>
+                    <div class="ml-14">
+                        <p class="text-gray-300 leading-relaxed">
+                            You agree to use the Service only for lawful purposes and in compliance with
+                            Discord's Terms of Service and Community Guidelines.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 4 -->
+                <div class="group/section">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                            <span class="text-xl font-bold text-purple-400">4</span>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-1">Account Access</h2>
+                    </div>
+                    <div class="ml-14">
+                        <p class="text-gray-300 leading-relaxed">
+                            Authentication is handled through Discord OAuth. You are responsible for maintaining
+                            the security of your Discord account.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 5 -->
+                <div class="group/section">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                            <span class="text-xl font-bold text-purple-400">5</span>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-1">Availability & Changes</h2>
+                    </div>
+                    <div class="ml-14">
+                        <p class="text-gray-300 leading-relaxed">
+                            We may modify, suspend, or discontinue any part of the Service at any time without
+                            prior notice.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 6 -->
+                <div class="group/section">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                            <span class="text-xl font-bold text-purple-400">6</span>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-1">Disclaimer</h2>
+                    </div>
+                    <div class="ml-14">
+                        <p class="text-gray-300 leading-relaxed">
+                            The Service is provided "as is" and "as available" without warranties of any kind.
+                            We do not guarantee uptime, reliability, or error-free operation.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 7 -->
+                <div class="group/section">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                            <span class="text-xl font-bold text-purple-400">7</span>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-1">Limitation of Liability</h2>
+                    </div>
+                    <div class="ml-14">
+                        <p class="text-gray-300 leading-relaxed">
+                            Happy Manifests shall not be liable for any damages resulting from the use or
+                            inability to use the Service.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Section 8 -->
+                <div class="group/section">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center border border-white/10">
+                            <span class="text-xl font-bold text-purple-400">8</span>
+                        </div>
+                        <h2 class="text-2xl font-bold mt-1">Affiliation</h2>
+                    </div>
+                    <div class="ml-14">
+                        <p class="text-gray-300 leading-relaxed">
+                            Happy Manifests is not affiliated with Discord Inc. All trademarks belong to their
+                            respective owners.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Info -->
+        <div class="mt-12 text-center">
+            <div class="inline-flex flex-col items-center gap-4 p-6 rounded-2xl glass-card border border-white/10">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-gray-400 text-sm">Questions about these terms?</p>
+                    <p class="text-purple-400 font-medium">Contact: neporrex@gmail.com</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="relative z-10 border-t border-white/10 mt-20 pt-8 pb-8">
+        <div class="max-w-4xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-500">
+            <p>© 2026 Happy Manifests.</p>
+            <div class="flex gap-6">
+                <a href="../privacy/" class="hover:text-purple-500 transition-colors">Privacy Policy</a>
+                <a href="../tos/" class="text-purple-400 font-medium">Terms of Service</a>
+                <a href="../" class="hover:text-purple-500 transition-colors">Home</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Mouse Glow Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const mouseGlow = document.getElementById('mouseGlow');
+            
+            if (!mouseGlow) return;
+            
+            // Activate the glow when mouse enters the window
+            document.addEventListener('mouseenter', () => {
+                mouseGlow.classList.add('active');
+            });
+            
+            // Deactivate when mouse leaves the window
+            document.addEventListener('mouseleave', () => {
+                mouseGlow.classList.remove('active');
+            });
+            
+            // Track mouse movement
+            document.addEventListener('mousemove', (e) => {
+                mouseGlow.style.left = `${e.clientX}px`;
+                mouseGlow.style.top = `${e.clientY}px`;
+                
+                // Optional: Increase glow size slightly when hovering over interactive elements
+                const target = e.target;
+                const isInteractive = target.closest('a, button, .glass-card');
+                
+                if (isInteractive) {
+                    mouseGlow.style.width = '150px';
+                    mouseGlow.style.height = '150px';
+                    mouseGlow.style.filter = 'blur(20px)';
+                } else {
+                    mouseGlow.style.width = '90px';
+                    mouseGlow.style.height = '90px';
+                    mouseGlow.style.filter = 'blur(16px)';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
