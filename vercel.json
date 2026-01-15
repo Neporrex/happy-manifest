@@ -1,11 +1,11 @@
 {
   "functions": {
-    "api/main.py": {
+    "api/index.py": {
       "runtime": "python3.9"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/main.py" },
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
     { "source": "/", "destination": "/index.html" },
     { "source": "/dashboard", "destination": "/dashboard/index.html" },
     { "source": "/tos", "destination": "/tos/index.html" },
