@@ -6,14 +6,12 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/main.py" },
-    { "source": "/", "destination": "public/index.html" },
-    { "source": "/dashboard", "destination": "public/dashboard/index.html" },
-    { "source": "/tos", "destination": "public/tos/index.html" },
-    { "source": "/privacy", "destination": "public/privacy/index.html" },
-    { "source": "/404", "destination": "public/404/index.html" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "public/index.html" }
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/dashboard", "destination": "/dashboard/index.html" },
+    { "source": "/tos", "destination": "/tos/index.html" },
+    { "source": "/privacy", "destination": "/privacy/index.html" },
+    { "source": "/404", "destination": "/404/index.html" },
+    { "source": "/(.*)", "destination": "/404/index.html" }
   ],
   "headers": [
     {
