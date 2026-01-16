@@ -42,7 +42,7 @@ app.include_router(guilds_router, prefix="/api/guilds", tags=["Guilds"])
 @app.get("/")
 async def root():
     """Redirect root to dashboard"""
-    return RedirectResponse(url="/dashboard")
+    return RedirectResponse(url="/")
 
 @app.get("/health")
 async def health():
