@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 import os
@@ -19,31 +19,39 @@ app = FastAPI(
     version="1.0.0"
 )
 
-DASHBOARD_URL = os.getenv("DASHBOARD_URL", "http://localhost:5173")
+DASHBOARD_URL = os.getenv("DASHBOARD_URL", "https://happy-manifest.vercel.app")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[DASHBOARD_URL, "http://localhost:5173", "https://*.vercel.app"],
+    allow_origins=[
+        DASHBOARD_URL,
+        "http://localhost:5173",
+        "https://happy-manifest.vercel.app",
+        "https://*.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include all your API routes
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(config_router, prefix="/api/config", tags=["Configuration"])
 app.include_router(guilds_router, prefix="/api/guilds", tags=["Guilds"])
 
 @app.get("/")
 async def root():
-    return {
-        "name": "Happy Bot API",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+    """Redirect root to dashboard"""
+    return RedirectResponse(url="/dashboard")
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+@app.get("/docs")
+async def docs_redirect():
+    """Redirect to FastAPI docs"""
+    return RedirectResponse(url="/docs")
 
 if __name__ == "__main__":
     import uvicorn
