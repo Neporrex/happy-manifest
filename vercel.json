@@ -1,14 +1,12 @@
 {
-  "functions": {
-    "api/*.py": {
-      "runtime": "python@3.9"
-    }
-  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index.py" },
-    { "source": "/dashboard", "destination": "/public/dashboard.html" },
-    { "source": "/dashboard/(.*)", "destination": "/public/dashboard.html" },
-    { "source": "/", "destination": "/public/index.html" },
-    { "source": "/(.*)", "destination": "/public/$1" }
+    { 
+      "source": "/api/(.*)", 
+      "destination": "https://fastapi-production-bca7.up.railway.app/api/$1" 
+    },
+    { 
+      "source": "/(.*)", 
+      "destination": "/public/$1" 
+    }
   ]
 }
