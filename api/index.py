@@ -1,6 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
 import os
 from dotenv import load_dotenv
 import sys
@@ -35,15 +34,11 @@ app.include_router(guilds_router, prefix="/api/guilds", tags=["Guilds"])
 
 @app.get("/")
 async def root():
-    return {
-        "name": "Happy Bot API",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+    return {"name":"Happy Bot API","version":"1.0.0","docs":"/docs"}
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {"status":"healthy"}
 
 if __name__ == "__main__":
     import uvicorn
