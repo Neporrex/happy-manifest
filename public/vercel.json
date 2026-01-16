@@ -1,11 +1,8 @@
 {
-  "functions": {
-    "api/index.py": {
-      "runtime": "python3.9"
-    }
-  },
   "rewrites": [
-    { "source": "/api/(.*)", "dest": "/api/index.py" },
-    { "source": "/(.*)", "dest": "/index.html" }
+    { 
+      "source": "/(.*)", 
+      "destination": "/index.html" 
+    }
   ]
 }
