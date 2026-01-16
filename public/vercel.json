@@ -6,6 +6,8 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "dest": "/api/index.py" },
-    { "source": "/(.*)", "dest": "/public/$1" }
+    { "source": "/dashboard", "dest": "/public/dashboard/index.html" },
+    { "source": "/dashboard/(.*)", "dest": "/public/dashboard/index.html" },
+    { "source": "/", "dest": "/public/index.html" }
   ]
 }
