@@ -39,11 +39,6 @@ app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(config_router, prefix="/api/config", tags=["Configuration"])
 app.include_router(guilds_router, prefix="/api/guilds", tags=["Guilds"])
 
-@app.get("/")
-async def root():
-    """Redirect root to dashboard"""
-    return RedirectResponse(url="/index.html")
-
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
