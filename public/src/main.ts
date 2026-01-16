@@ -1,7 +1,7 @@
 // main.ts - Clean, working Discord bot dashboard
 const API_BASE = window.location.hostname === 'localhost' 
     ? 'http://localhost:8000' 
-    : 'https://api-happy-production.up.railway.app';
+    : 'https://api-happy-production.up.railway.app:';
 
 console.log('API Base URL:', API_BASE);
 
