@@ -5,9 +5,10 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "dest": "/api/index.py" },
-    { "source": "/dashboard", "dest": "/public/dashboard/index.html" },
-    { "source": "/dashboard/(.*)", "dest": "/public/dashboard/index.html" },
-    { "source": "/", "dest": "/public/index.html" }
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/dashboard", "destination": "/public/dashboard.html" },
+    { "source": "/dashboard/(.*)", "destination": "/public/dashboard.html" },
+    { "source": "/", "destination": "/public/index.html" },
+    { "source": "/(.*)", "destination": "/public/$1" }
   ]
 }
