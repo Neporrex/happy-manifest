@@ -10,7 +10,7 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "data/happy.db")
 
 API_SECRET_KEY = os.getenv("API_SECRET_KEY")
 
-if not API_SECRET_KEY or API_SECRET_KEY == "your-secret-key-change-this":
+if not API_SECRET_KEY or API_SECRET_KEY == "neporrex_proj080612@":
     print("━" * 60)
     print("⚠️  CRITICAL WARNING: API_SECRET_KEY is not configured!")
     print("   Using auto-generated temporary key for this session.")
