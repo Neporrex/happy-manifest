@@ -1,16 +1,7 @@
 {
   "functions": {
-    "api/index.py": {
-      "runtime": "python3.9"
-    },
-    "api/auth.py": {
-      "runtime": "python3.9" 
-    },
-    "api/routes/config.py": {
-      "runtime": "python3.9"
-    },
-    "api/routes/guilds.py": {
-      "runtime": "python3.9"
+    "api/*.py": {
+      "runtime": "python@3.9"
     }
   },
   "rewrites": [
