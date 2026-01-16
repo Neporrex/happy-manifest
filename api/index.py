@@ -38,7 +38,7 @@ app.include_router(guilds_router, prefix="/api/guilds", tags=["Guilds"])
 
 @app.get("/")
 async def root():
-    return FileResponse("/public/index.html")
+    return FileResponse("../public/index.html")
 
 @app.get("/health")
 async def health():
