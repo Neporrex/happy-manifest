@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import os
 from dotenv import load_dotenv
 import sys
@@ -28,13 +30,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(config_router, prefix="/api/config", tags=["Configuration"])
 app.include_router(guilds_router, prefix="/api/guilds", tags=["Guilds"])
 
 @app.get("/")
 async def root():
-    return {"name":"Happy Bot API","version":"1.0.0","docs":"/docs"}
+    return FileResponse("/public/index.html")
 
 @app.get("/health")
 async def health():
