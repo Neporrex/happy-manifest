@@ -3,7 +3,8 @@ const API_BASE = window.location.hostname === 'localhost'
     ? 'http://localhost:8000' 
     : 'https://api-happy-production.up.railway.app';
 
-console.log('API Base URL:', API_BASE);
+console.log('🌐 API Base URL:', API_BASE);
+console.log('📍 Current URL:', window.location.href);
 
 // Types
 interface User {
@@ -12,6 +13,7 @@ interface User {
     discriminator: string;
     avatar: string | null;
     email?: string;
+    global_name?: string;
 }
 
 interface Guild {
@@ -61,7 +63,7 @@ function showError(message: string) {
 // API fetch helper
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const url = `${API_BASE}${endpoint}`;
-    console.log('Fetching:', url);
+    console.log('📡 Fetching:', url);
     
     const headers: HeadersInit = {
         'Content-Type': 'application/json',
@@ -81,7 +83,7 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
             credentials: 'include',
         });
 
-        console.log('Response status:', response.status);
+        console.log('📊 Response status:', response.status, response.statusText);
 
         if (!response.ok) {
             if (response.status === 401) {
@@ -94,11 +96,11 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
         }
 
         const data = await response.json();
-        console.log('Response data:', data);
+        console.log('✅ Response data:', data);
         return data;
 
     } catch (error) {
-        console.error('Fetch error:', error);
+        console.error('❌ Fetch error:', error);
         throw error;
     }
 }
@@ -109,11 +111,31 @@ function checkURLToken() {
     const token = params.get('token');
     
     if (token) {
-        console.log('Found token in URL');
+        console.log('✅ Found token in URL');
         localStorage.setItem('discord_token', token);
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Clean URL - remove token from URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('token');
+        
+        // Also remove any auth errors
+        url.searchParams.delete('auth_error');
+        
+        window.history.replaceState({}, document.title, url.pathname + url.search);
+        
         return true;
+    }
+    
+    // Check for auth errors
+    const authError = params.get('auth_error');
+    if (authError) {
+        console.error('❌ Auth error from callback:', decodeURIComponent(authError));
+        alert(`Authentication failed: ${decodeURIComponent(authError)}`);
+        
+        // Clean URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('auth_error');
+        window.history.replaceState({}, document.title, url.pathname);
     }
     
     return false;
@@ -122,16 +144,21 @@ function checkURLToken() {
 // Load current user
 async function loadCurrentUser() {
     try {
-        console.log('Loading user...');
+        console.log('👤 Loading user...');
         currentUser = await fetchAPI<User>('/api/auth/me');
-        console.log('User loaded:', currentUser);
+        console.log('✅ User loaded:', currentUser);
         
         // Update UI
         if (elements.userAvatar() && currentUser.avatar) {
             elements.userAvatar().src = `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png`;
+            elements.userAvatar().onerror = () => {
+                elements.userAvatar().src = 'https://cdn.discordapp.com/embed/avatars/0.png';
+            };
         }
+        
         if (elements.userName()) {
-            elements.userName().textContent = currentUser.username;
+            const displayName = currentUser.global_name || currentUser.username;
+            elements.userName().textContent = displayName;
         }
         
         // Load guilds
@@ -141,7 +168,7 @@ async function loadCurrentUser() {
         showSection('dashboardSection');
         
     } catch (error) {
-        console.error('Failed to load user:', error);
+        console.error('❌ Failed to load user:', error);
         showSection('loginSection');
     }
 }
@@ -149,14 +176,14 @@ async function loadCurrentUser() {
 // Load user's guilds
 async function loadUserGuilds() {
     try {
-        console.log('Loading guilds...');
+        console.log('🏰 Loading guilds...');
         userGuilds = await fetchAPI<Guild[]>('/api/auth/guilds');
-        console.log('Guilds loaded:', userGuilds.length);
+        console.log(`✅ Guilds loaded: ${userGuilds.length} servers`);
         
         renderGuildsList();
         
     } catch (error) {
-        console.error('Failed to load guilds:', error);
+        console.error('❌ Failed to load guilds:', error);
         userGuilds = [];
         renderGuildsList();
     }
@@ -190,6 +217,7 @@ function renderGuildsList() {
             <div class="guild-info">
                 <h3 class="guild-name">${guild.name}</h3>
                 ${guild.owner ? '<span class="badge owner">Owner</span>' : ''}
+                ${guild.permissions && guild.permissions.includes('8') ? '<span class="badge admin">Admin</span>' : ''}
             </div>
             <div class="guild-arrow">→</div>
         </div>
@@ -220,13 +248,13 @@ async function loadGuildConfig(guildId: string) {
         
         // Load config data
         const config = await fetchAPI<any>(`/api/config/${guildId}`);
-        console.log('Guild config:', config);
+        console.log('⚙️ Guild config loaded:', config);
         
         // For now, just show we loaded it
         alert(`Loaded config for ${guild?.name || 'server'}`);
         
     } catch (error) {
-        console.error('Failed to load guild config:', error);
+        console.error('❌ Failed to load guild config:', error);
         showError('Could not load server configuration');
     }
 }
@@ -235,7 +263,9 @@ async function loadGuildConfig(guildId: string) {
 function setupEventListeners() {
     // Login button
     if (elements.loginBtn()) {
-        elements.loginBtn().addEventListener('click', () => {
+        elements.loginBtn().addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('🔗 Redirecting to Discord login...');
             window.location.href = `${API_BASE}/api/auth/login`;
         });
     }
@@ -249,6 +279,11 @@ function setupEventListeners() {
                 userGuilds = [];
                 selectedGuildId = null;
                 showSection('loginSection');
+                
+                // If on dashboard, redirect to home
+                if (window.location.pathname.includes('/dashboard')) {
+                    window.location.href = '/';
+                }
             }
         });
     }
@@ -270,23 +305,23 @@ function setupEventListeners() {
 
 // Initialize the app
 async function initializeApp() {
-    console.log('Initializing app...');
-    console.log('Window location:', window.location.href);
+    console.log('🚀 Initializing app...');
+    console.log('📍 Current URL:', window.location.href);
     
     setupEventListeners();
     
-    // Check for token in URL first
-    checkURLToken();
+    // Check for token in URL first (from OAuth callback)
+    const hasToken = checkURLToken();
     
     // Check if we have a token stored
     const token = localStorage.getItem('discord_token');
-    console.log('Stored token exists:', !!token);
+    console.log('🔑 Stored token exists:', !!token);
     
-    if (token) {
-        console.log('Token found, loading user...');
+    if (token || hasToken) {
+        console.log('🔑 Token found, loading user...');
         await loadCurrentUser();
     } else {
-        console.log('No token found, showing login');
+        console.log('🔑 No token found, showing login');
         showSection('loginSection');
     }
 }
@@ -300,6 +335,7 @@ if (document.readyState === 'loading') {
 
 // Export for debugging
 (window as any).App = {
+    API_BASE,
     currentUser,
     userGuilds,
     selectedGuildId,
@@ -307,5 +343,16 @@ if (document.readyState === 'loading') {
     logout: () => {
         localStorage.removeItem('discord_token');
         showSection('loginSection');
+    },
+    testAPI: async () => {
+        try {
+            const response = await fetch(`${API_BASE}/health`);
+            const data = await response.json();
+            console.log('🧪 API Health:', data);
+            return data;
+        } catch (error) {
+            console.error('🧪 API Test failed:', error);
+            return null;
+        }
     }
 };
