@@ -19,7 +19,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-DASHBOARD_URL = os.getenv("DASHBOARD_URL", "https://happy-manifest.vercel.app")
+DASHBOARD_URL = os.getenv("DASHBOARD_URL", "https://happy-manifest.vercel.app/dashboard")
 
 app.add_middleware(
     CORSMiddleware,
