@@ -1,92 +1,51 @@
-// Dashboard Script - FIXED for your API
+// dashboard.js - UPDATED FOR YOUR ACTUAL API
 class DashboardManager {
     constructor() {
-        this.API_BASE_URL = 'https://api-happy-production.up.railway.app';
+        this.API_BASE = 'https://api-happy-production.up.railway.app';
         this.userToken = null;
         this.userData = null;
         this.servers = [];
         this.currentServer = null;
-        this.isInitialized = false;
         
-        // Debug mode
-        this.debug = window.location.search.includes('debug');
-        
+        console.log('🚀 Dashboard Manager initialized');
         this.init();
     }
 
     async init() {
-        console.log('🚀 Dashboard initializing...');
+        console.log('🔍 Initializing dashboard...');
         
         // Get token from URL
         this.userToken = this.getTokenFromURL();
+        console.log('🔑 Token:', this.userToken ? this.userToken.substring(0, 10) + '...' : 'No token');
         
         if (!this.userToken) {
-            this.showError('No authentication token found. Please login again.', true);
+            this.showError('❌ No authentication token found. Redirecting to login...');
             setTimeout(() => window.location.href = '/', 3000);
             return;
         }
 
-        if (this.debug) {
-            console.log('🔑 Token found:', this.userToken.substring(0, 10) + '...');
-        }
-
         try {
-            // First, let's discover what endpoints your API has
-            await this.discoverEndpoints();
+            console.log('📡 Testing API connection...');
             
-            // Try to load user data
+            // First verify API is reachable
+            const apiCheck = await fetch(this.API_BASE);
+            console.log('✅ API reachable:', apiCheck.status);
+            
+            // Load user data
             await this.loadUserData();
             
-            // Try to load servers
-            await this.loadServers();
+            // Load servers/guilds
+            await this.loadGuilds();
             
             // Success - hide loading screen
             this.hideLoading();
-            this.isInitialized = true;
-            
             console.log('✅ Dashboard loaded successfully');
             
         } catch (error) {
-            console.error('❌ Initialization error:', error);
-            this.showError('Failed to load dashboard. Trying fallback mode...', false);
-            
-            // Try fallback mode
-            await this.fallbackMode();
+            console.error('❌ Dashboard initialization failed:', error);
+            this.showError('Failed to load dashboard. Check console for details.');
+            this.useFallbackData();
         }
-    }
-
-    async discoverEndpoints() {
-        console.log('🔍 Discovering API endpoints...');
-        
-        // Common endpoint patterns to try
-        const testEndpoints = [
-            '/user',
-            '/users/me',
-            '/auth/user',
-            '/api/user',
-            '/profile',
-            '/auth/profile'
-        ];
-        
-        for (const endpoint of testEndpoints) {
-            try {
-                const response = await fetch(`${this.API_BASE_URL}${endpoint}`, {
-                    headers: {
-                        'Authorization': `Bearer ${this.userToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (response.ok) {
-                    console.log(`✅ Found endpoint: ${endpoint}`);
-                    return endpoint;
-                }
-            } catch (e) {
-                // Continue to next endpoint
-            }
-        }
-        
-        throw new Error('No valid user endpoint found');
     }
 
     getTokenFromURL() {
@@ -94,251 +53,187 @@ class DashboardManager {
         const token = urlParams.get('token');
         
         if (token) {
-            // Store in sessionStorage for persistence
-            sessionStorage.setItem('hm_token', token);
+            // Store in localStorage for persistence
+            localStorage.setItem('hm_token', token);
+            console.log('💾 Token saved to localStorage');
             return token;
         }
         
-        // Try to get from sessionStorage
-        return sessionStorage.getItem('hm_token');
+        // Try to get from localStorage
+        const storedToken = localStorage.getItem('hm_token');
+        if (storedToken) {
+            console.log('📂 Using token from localStorage');
+            return storedToken;
+        }
+        
+        return null;
     }
 
     async loadUserData() {
-        console.log('👤 Loading user data...');
+        console.log('👤 Loading user data from /api/auth/me...');
         
-        // First, let's try a direct ping to the API root
         try {
-            const ping = await fetch(this.API_BASE_URL, {
+            const response = await fetch(`${this.API_BASE}/api/auth/me`, {
                 headers: {
-                    'Authorization': `Bearer ${this.userToken}`
+                    'Authorization': `Bearer ${this.userToken}`,
+                    'Content-Type': 'application/json'
                 }
             });
-            console.log('📡 API ping response:', ping.status, ping.statusText);
-        } catch (e) {
-            console.log('📡 API ping failed:', e.message);
-        }
-
-        // Try different endpoint approaches
-        const endpoints = [
-            { url: `${this.API_BASE_URL}/user`, method: 'GET' },
-            { url: `${this.API_BASE_URL}/users/me`, method: 'GET' },
-            { url: `${this.API_BASE_URL}/auth/me`, method: 'GET' },
-            { url: `${this.API_BASE_URL}/api/user`, method: 'GET' },
-            // Try POST with token in body (common pattern)
-            { 
-                url: `${this.API_BASE_URL}/auth/verify`, 
-                method: 'POST',
-                body: { token: this.userToken }
+            
+            console.log('📊 User endpoint response:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                throw new Error(`API returned ${response.status}: ${response.statusText}`);
             }
-        ];
-
-        for (const endpoint of endpoints) {
-            try {
-                console.log(`🔍 Trying: ${endpoint.method} ${endpoint.url}`);
-                
-                const options = {
-                    method: endpoint.method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${this.userToken}`
-                    }
-                };
-                
-                if (endpoint.body) {
-                    options.body = JSON.stringify(endpoint.body);
-                }
-
-                const response = await fetch(endpoint.url, options);
-                
-                console.log(`📊 Response: ${response.status} ${response.statusText}`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('✅ User data received:', data);
-                    
-                    this.userData = this.formatUserData(data);
-                    this.displayUserData();
-                    return;
-                }
-            } catch (error) {
-                console.log(`❌ Failed: ${error.message}`);
-            }
+            
+            this.userData = await response.json();
+            console.log('✅ User data received:', this.userData);
+            
+            // Format avatar URL
+            this.formatUserAvatar();
+            
+            // Display user data
+            this.displayUserData();
+            
+        } catch (error) {
+            console.error('❌ Failed to load user data:', error);
+            throw error; // Re-throw to be caught in init
         }
-        
-        // If all endpoints fail, use mock data
-        console.log('⚠️ Using fallback user data');
-        this.userData = this.getFallbackUserData();
-        this.displayUserData();
     }
 
-    formatUserData(data) {
-        // Normalize user data from different API responses
-        const user = {
-            id: data.id || data.user_id || data.discord_id || `user_${Date.now()}`,
-            username: data.username || data.name || data.display_name || 'User',
-            discriminator: data.discriminator || '0000',
-            avatar: data.avatar || data.avatar_url || null,
-            email: data.email || `${data.username || 'user'}@example.com`,
-            // Discord-specific fields
-            global_name: data.global_name,
-            // Your API might have these
-            created_at: data.created_at,
-            is_bot: data.bot || false
-        };
+    formatUserAvatar() {
+        if (!this.userData) return;
         
-        // Format avatar URL
-        if (user.avatar) {
-            if (user.avatar.startsWith('http')) {
-                user.avatar_url = user.avatar;
-            } else if (user.id && user.avatar) {
-                // Check if it's a Discord ID pattern
-                if (/^\d+$/.test(user.id)) {
-                    user.avatar_url = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
-                }
-            }
+        // Check if avatar URL is already provided
+        if (this.userData.avatar_url) {
+            return;
         }
         
-        if (!user.avatar_url) {
-            const defaultAvatar = parseInt(user.discriminator) % 5 || 0;
-            user.avatar_url = `https://cdn.discordapp.com/embed/avatars/${defaultAvatar}.png`;
+        // Format Discord avatar URL
+        if (this.userData.avatar && this.userData.id) {
+            // Has Discord avatar hash
+            this.userData.avatar_url = `https://cdn.discordapp.com/avatars/${this.userData.id}/${this.userData.avatar}.png?size=256`;
+        } else if (this.userData.discriminator) {
+            // Use default Discord avatar
+            const avatarNum = parseInt(this.userData.discriminator) % 5;
+            this.userData.avatar_url = `https://cdn.discordapp.com/embed/avatars/${avatarNum}.png`;
+        } else {
+            // Fallback
+            this.userData.avatar_url = 'https://cdn.discordapp.com/embed/avatars/0.png';
         }
         
-        return user;
-    }
-
-    getFallbackUserData() {
-        // Create user data from token (for demo)
-        const timestamp = Date.now();
-        return {
-            id: `demo_${timestamp}`,
-            username: 'DemoUser',
-            discriminator: String(timestamp % 10000).padStart(4, '0'),
-            avatar_url: 'https://cdn.discordapp.com/embed/avatars/0.png',
-            email: 'demo@example.com',
-            is_demo: true
-        };
+        // Add global_name if not present
+        if (!this.userData.global_name && this.userData.username) {
+            this.userData.global_name = this.userData.username;
+        }
     }
 
     displayUserData() {
+        console.log('🖼️ Displaying user data...');
+        
         const userName = document.getElementById('userName');
         const userEmail = document.getElementById('userEmail');
         const userAvatar = document.getElementById('userAvatar');
 
-        if (!userName || !userEmail || !userAvatar) {
-            console.error('❌ User elements not found in DOM');
+        if (!userName || !userAvatar) {
+            console.error('❌ DOM elements not found');
             return;
         }
 
-        const displayName = this.userData.global_name || 
-                           this.userData.username || 
-                           'Discord User';
-        
-        const discriminator = this.userData.discriminator ? 
-                             `#${this.userData.discriminator}` : '';
-
-        userName.textContent = `${displayName}${discriminator}`;
-        userName.title = `ID: ${this.userData.id}`;
-        
-        userEmail.textContent = this.userData.email || 
+        if (this.userData) {
+            // Use global_name if available, otherwise username
+            const displayName = this.userData.global_name || 
                                this.userData.username || 
-                               'Dashboard User';
-
-        // Set avatar with multiple fallbacks
-        const avatarUrl = this.userData.avatar_url || 
-                         this.userData.avatar || 
-                         'https://cdn.discordapp.com/embed/avatars/0.png';
-        
-        userAvatar.innerHTML = `
-            <img src="${avatarUrl}" 
-                 alt="${displayName}" 
-                 style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;"
-                 onerror="this.onerror=null;
-                         this.src='https://cdn.discordapp.com/embed/avatars/0.png';
-                         this.style.opacity='0.8'">
-        `;
-
-        // Add demo badge if using fallback
-        if (this.userData.is_demo) {
-            userName.innerHTML += ' <span style="font-size: 10px; color: #888; background: #2a2d31; padding: 2px 6px; border-radius: 10px; margin-left: 5px;">DEMO</span>';
+                               'Discord User';
+            
+            // Add discriminator if available
+            const discriminator = this.userData.discriminator ? 
+                                 `#${this.userData.discriminator}` : '';
+            
+            userName.textContent = `${displayName}${discriminator}`;
+            
+            // Set email if available
+            if (userEmail) {
+                userEmail.textContent = this.userData.email || 
+                                       this.userData.username || 
+                                       'Discord User';
+            }
+            
+            // Set avatar with error handling
+            const avatarUrl = this.userData.avatar_url || 
+                             'https://cdn.discordapp.com/embed/avatars/0.png';
+            
+            userAvatar.innerHTML = `
+                <img src="${avatarUrl}" 
+                     alt="${displayName}" 
+                     style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;"
+                     onerror="this.onerror=null;
+                             console.error('Failed to load avatar:', this.src);
+                             this.src='https://cdn.discordapp.com/embed/avatars/0.png';
+                             this.style.opacity='0.8';">
+            `;
+            
+            console.log('✅ User displayed:', displayName);
         }
     }
 
-    async loadServers() {
-        console.log('🏰 Loading servers...');
+    async loadGuilds() {
+        console.log('🏰 Loading guilds from /api/auth/guilds...');
         
-        // Try different server endpoints
-        const endpoints = [
-            `${this.API_BASE_URL}/guilds`,
-            `${this.API_BASE_URL}/servers`,
-            `${this.API_BASE_URL}/api/guilds`,
-            `${this.API_BASE_URL}/api/servers`,
-            `${this.API_BASE_URL}/user/guilds`
-        ];
-
-        for (const url of endpoints) {
-            try {
-                console.log(`🔍 Trying servers endpoint: ${url}`);
-                
-                const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `Bearer ${this.userToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                console.log(`📊 Response: ${response.status}`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('✅ Servers received:', data.length || data);
-                    
-                    this.servers = Array.isArray(data) ? data : [];
-                    this.formatServers();
-                    this.displayServers();
-                    return;
+        try {
+            const response = await fetch(`${this.API_BASE}/api/auth/guilds`, {
+                headers: {
+                    'Authorization': `Bearer ${this.userToken}`,
+                    'Content-Type': 'application/json'
                 }
-            } catch (error) {
-                console.log(`❌ Failed: ${error.message}`);
+            });
+            
+            console.log('📊 Guilds endpoint response:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                throw new Error(`Guilds API returned ${response.status}`);
             }
+            
+            this.servers = await response.json();
+            console.log(`✅ Received ${this.servers.length} guilds`);
+            
+            // Format guild data
+            this.formatGuilds();
+            
+            // Display guilds
+            this.displayGuilds();
+            
+        } catch (error) {
+            console.error('❌ Failed to load guilds:', error);
+            this.servers = this.getMockGuilds();
+            this.displayGuilds();
         }
-        
-        // If no servers found, use mock data
-        console.log('⚠️ Using mock servers');
-        this.servers = this.getMockServers();
-        this.displayServers();
     }
 
-    formatServers() {
-        this.servers = this.servers.map(server => {
-            // Normalize server data
-            const normalized = {
-                id: server.id || server.guild_id || `server_${Math.random().toString(36).substr(2, 9)}`,
-                name: server.name || server.guild_name || 'Unnamed Server',
-                icon: server.icon || server.icon_url || server.icon_hash || null,
-                member_count: server.member_count || server.members || server.memberCount || 0,
-                online_count: server.online_count || server.online || server.onlineCount || 0,
-                bot_joined: server.bot_joined !== false,
-                permissions: server.permissions || server.permissions_new || 0
-            };
-            
-            // Format icon URL
-            if (normalized.icon) {
-                if (normalized.icon.startsWith('http')) {
-                    normalized.icon_url = normalized.icon;
-                } else if (/^\d+$/.test(normalized.id) && normalized.icon) {
-                    normalized.icon_url = `https://cdn.discordapp.com/icons/${normalized.id}/${normalized.icon}.png`;
-                }
+    formatGuilds() {
+        this.servers = this.servers.map(guild => {
+            // Add icon URL if not present
+            if (!guild.icon_url && guild.icon) {
+                guild.icon_url = `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=256`;
             }
             
-            if (!normalized.icon_url) {
-                normalized.icon_url = null;
+            // Check if user can manage this guild
+            if (guild.permissions !== undefined) {
+                guild.can_manage = (guild.permissions & 0x20) !== 0 ||  // MANAGE_GUILD
+                                   (guild.permissions & 0x8) !== 0;     // ADMINISTRATOR
+            } else {
+                guild.can_manage = true; // Assume yes if permissions not provided
             }
             
-            return normalized;
+            return guild;
         });
+        
+        // Filter to only manageable guilds
+        this.servers = this.servers.filter(guild => guild.can_manage);
+        console.log(`📊 ${this.servers.length} manageable guilds after filtering`);
     }
 
-    displayServers() {
+    displayGuilds() {
         const serversList = document.getElementById('serversList');
         if (!serversList) {
             console.error('❌ serversList element not found');
@@ -351,90 +246,104 @@ class DashboardManager {
             serversList.innerHTML = `
                 <div style="text-align: center; padding: 30px; color: #888;">
                     <div style="font-size: 48px; margin-bottom: 10px;">🏰</div>
-                    <p>No servers available</p>
+                    <p>No servers available to manage</p>
                     <small style="font-size: 12px; opacity: 0.7;">
-                        The bot might not be in any servers you manage
+                        You need "Manage Server" permission in Discord
                     </small>
                 </div>
             `;
             return;
         }
 
-        this.servers.forEach((server, index) => {
-            const serverElement = document.createElement('div');
-            serverElement.className = 'server-item';
-            serverElement.dataset.serverId = server.id;
-            serverElement.title = `${server.name}\nMembers: ${server.member_count}`;
-            serverElement.style.cssText = `
+        console.log(`🖼️ Displaying ${this.servers.length} guilds...`);
+
+        this.servers.forEach((guild, index) => {
+            const guildElement = document.createElement('div');
+            guildElement.className = 'server-item';
+            guildElement.dataset.guildId = guild.id;
+            guildElement.title = `${guild.name}\nID: ${guild.id}`;
+            
+            // Apply basic styling if CSS not loaded
+            guildElement.style.cssText = `
                 display: flex;
                 align-items: center;
-                gap: 10px;
-                padding: 10px;
+                gap: 12px;
+                padding: 12px;
                 border-radius: 8px;
                 cursor: pointer;
                 transition: background 0.2s;
-                margin-bottom: 5px;
+                margin-bottom: 8px;
+                background: transparent;
             `;
-            
-            serverElement.onmouseover = () => {
-                serverElement.style.background = 'rgba(79, 84, 92, 0.3)';
+
+            // Make first guild active
+            if (index === 0) {
+                guildElement.classList.add('active');
+                guildElement.style.background = 'rgba(88, 101, 242, 0.3)';
+                setTimeout(() => this.selectGuild(guild), 100);
+            }
+
+            // Hover effects
+            guildElement.onmouseenter = () => {
+                if (!guildElement.classList.contains('active')) {
+                    guildElement.style.background = 'rgba(79, 84, 92, 0.3)';
+                }
             };
-            serverElement.onmouseout = () => {
-                if (!serverElement.classList.contains('active')) {
-                    serverElement.style.background = 'transparent';
+            guildElement.onmouseleave = () => {
+                if (!guildElement.classList.contains('active')) {
+                    guildElement.style.background = 'transparent';
                 }
             };
 
-            if (index === 0) {
-                serverElement.classList.add('active');
-                serverElement.style.background = 'rgba(88, 101, 242, 0.3)';
-                this.selectServer(server);
-            }
-
-            // Server avatar
-            let avatarHTML = '🏠';
-            if (server.icon_url) {
-                avatarHTML = `
-                    <img src="${server.icon_url}" 
-                         alt="${server.name}"
+            // Guild icon with fallback
+            let iconHTML = '🏠';
+            if (guild.icon_url) {
+                iconHTML = `
+                    <img src="${guild.icon_url}" 
+                         alt="${guild.name}"
                          style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;"
                          onerror="this.onerror=null;
+                                 console.error('Failed to load guild icon:', this.src);
                                  this.style.display='none';
-                                 this.parentElement.innerHTML='<div style=\\'width: 40px; height: 40px; border-radius: 50%; background: #2f3136; display: flex; align-items: center; justify-content: center; font-size: 20px;\\'>🏠</div>'">
+                                 this.parentElement.innerHTML='<div style=\\"width: 40px; height: 40px; border-radius: 50%; background: #2f3136; display: flex; align-items: center; justify-content: center; font-size: 20px;\\">🏠</div>'">
                 `;
             }
 
-            const botStatus = server.bot_joined ? 
-                '<div style="color: #57F287; font-size: 12px;" title="Bot is in this server">✓</div>' : 
-                '<div style="color: #ED4245; font-size: 12px;" title="Bot is not in this server">✗</div>';
-
-            serverElement.innerHTML = `
-                <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #2f3136;">
-                    ${avatarHTML}
+            guildElement.innerHTML = `
+                <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #2f3136; flex-shrink: 0;">
+                    ${iconHTML}
                 </div>
-                <div style="flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    ${server.name}
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${guild.name}
+                    </div>
+                    <div style="font-size: 11px; color: #888; margin-top: 2px;">
+                        ${guild.member_count ? guild.member_count.toLocaleString() + ' members' : ''}
+                    </div>
                 </div>
-                ${botStatus}
+                <div style="color: #57F287; font-size: 12px; flex-shrink: 0;" title="Bot is in this server">
+                    ✓
+                </div>
             `;
 
-            serverElement.addEventListener('click', () => {
+            // Click handler
+            guildElement.addEventListener('click', () => {
                 document.querySelectorAll('.server-item').forEach(item => {
                     item.classList.remove('active');
                     item.style.background = 'transparent';
                 });
-                serverElement.classList.add('active');
-                serverElement.style.background = 'rgba(88, 101, 242, 0.3)';
-                this.selectServer(server);
+                guildElement.classList.add('active');
+                guildElement.style.background = 'rgba(88, 101, 242, 0.3)';
+                this.selectGuild(guild);
             });
 
-            serversList.appendChild(serverElement);
+            serversList.appendChild(guildElement);
         });
     }
 
-    selectServer(server) {
-        console.log('🎯 Selected server:', server.name);
-        this.currentServer = server;
+    async selectGuild(guild) {
+        console.log('🎯 Selected guild:', guild.name, guild.id);
+        this.currentServer = guild;
         
         // Update UI
         const noServerSelected = document.getElementById('noServerSelected');
@@ -444,90 +353,91 @@ class DashboardManager {
         if (serverContent) serverContent.style.display = 'block';
         
         // Update stats
+        this.updateGuildStats(guild);
+        
+        // Load guild config and other data
+        await this.loadGuildConfig(guild.id);
+        await this.loadGuildChannels(guild.id);
+    }
+
+    updateGuildStats(guild) {
         const memberCountEl = document.getElementById('memberCount');
         const onlineCountEl = document.getElementById('onlineCount');
         
         if (memberCountEl) {
-            memberCountEl.textContent = server.member_count?.toLocaleString() || 'N/A';
-            memberCountEl.title = `Total members: ${server.member_count || 'Unknown'}`;
+            memberCountEl.textContent = guild.member_count?.toLocaleString() || 'N/A';
         }
         
         if (onlineCountEl) {
-            onlineCountEl.textContent = server.online_count?.toLocaleString() || 'N/A';
-            onlineCountEl.title = `Online members: ${server.online_count || 'Unknown'}`;
+            // Try to get online count from approximate_online_count if available
+            const onlineCount = guild.approximate_presence_count || 
+                               guild.online_count || 
+                               Math.floor((guild.member_count || 0) * 0.3); // Estimate 30% online
+            onlineCountEl.textContent = onlineCount.toLocaleString();
         }
-        
-        // Load server settings
-        this.loadServerSettings(server.id);
     }
 
-    async loadServerSettings(guildId) {
-        if (!guildId || guildId.startsWith('demo_') || guildId.startsWith('server_')) {
-            return; // Don't try for demo servers
-        }
+    async loadGuildConfig(guildId) {
+        console.log(`⚙️ Loading config for guild ${guildId}...`);
         
         try {
-            const endpoints = [
-                `${this.API_BASE_URL}/guild/${guildId}/settings`,
-                `${this.API_BASE_URL}/server/${guildId}/settings`,
-                `${this.API_BASE_URL}/api/guild/${guildId}/settings`
-            ];
-            
-            for (const url of endpoints) {
-                const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `Bearer ${this.userToken}`
-                    }
-                });
-                
-                if (response.ok) {
-                    const settings = await response.json();
-                    this.applyServerSettings(settings);
-                    break;
+            const response = await fetch(`${this.API_BASE}/api/config/${guildId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.userToken}`
                 }
+            });
+            
+            if (response.ok) {
+                const config = await response.json();
+                console.log('✅ Guild config loaded:', config);
+                this.applyGuildConfig(config);
+            } else {
+                console.log('ℹ️ No config found or unauthorized');
             }
         } catch (error) {
-            console.log('Settings load failed:', error.message);
+            console.error('Failed to load guild config:', error);
         }
     }
 
-    applyServerSettings(settings) {
-        // Map settings to toggles
+    async loadGuildChannels(guildId) {
+        console.log(`📢 Loading channels for guild ${guildId}...`);
+        
+        try {
+            const response = await fetch(`${this.API_BASE}/api/guilds/${guildId}/channels`, {
+                headers: {
+                    'Authorization': `Bearer ${this.userToken}`
+                }
+            });
+            
+            if (response.ok) {
+                const channels = await response.json();
+                console.log(`✅ Loaded ${channels.length} channels`);
+                // You could display these in your UI
+            }
+        } catch (error) {
+            console.log('Failed to load channels:', error);
+        }
+    }
+
+    applyGuildConfig(config) {
+        console.log('⚙️ Applying guild config to UI...');
+        
+        // Map config to your toggle switches
+        // Adjust these based on your actual config structure
         const toggleMap = {
-            welcomeEnabled: 'welcomeToggle',
-            autoMod: 'moderationToggle',
-            levelSystem: 'levelToggle',
-            musicEnabled: 'musicToggle'
+            welcome_enabled: 'welcomeToggle',
+            moderation_enabled: 'moderationToggle',
+            level_system_enabled: 'levelToggle',
+            music_enabled: 'musicToggle'
         };
         
-        for (const [setting, toggleId] of Object.entries(toggleMap)) {
+        for (const [configKey, toggleId] of Object.entries(toggleMap)) {
             const toggle = document.getElementById(toggleId);
-            if (toggle && settings[setting] !== undefined) {
-                toggle.checked = Boolean(settings[setting]);
-                console.log(`⚙️ Set ${toggleId} to ${toggle.checked}`);
+            if (toggle && config[configKey] !== undefined) {
+                toggle.checked = Boolean(config[configKey]);
+                console.log(`Set ${toggleId} to ${toggle.checked} from ${configKey}`);
             }
         }
-    }
-
-    getMockServers() {
-        return [
-            {
-                id: 'demo_gaming',
-                name: 'Gaming Community',
-                icon_url: null,
-                member_count: Math.floor(Math.random() * 5000) + 1000,
-                online_count: Math.floor(Math.random() * 1000) + 100,
-                bot_joined: true
-            },
-            {
-                id: 'demo_dev',
-                name: 'Development Hub',
-                icon_url: null,
-                member_count: Math.floor(Math.random() * 3000) + 500,
-                online_count: Math.floor(Math.random() * 800) + 50,
-                bot_joined: true
-            }
-        ];
     }
 
     hideLoading() {
@@ -535,186 +445,241 @@ class DashboardManager {
         const dashboardContainer = document.getElementById('dashboardContainer');
         
         if (loadingOverlay) {
+            loadingOverlay.style.transition = 'opacity 0.5s ease';
             loadingOverlay.style.opacity = '0';
-            loadingOverlay.style.transition = 'opacity 0.5s';
             setTimeout(() => {
                 loadingOverlay.style.display = 'none';
             }, 500);
         }
         
         if (dashboardContainer) {
-            dashboardContainer.style.opacity = '0';
             dashboardContainer.style.display = 'block';
             setTimeout(() => {
+                dashboardContainer.style.transition = 'opacity 0.5s ease';
                 dashboardContainer.style.opacity = '1';
-                dashboardContainer.style.transition = 'opacity 0.5s';
             }, 10);
         }
+        
+        console.log('👋 Loading screen hidden');
     }
 
-    showError(message, isCritical = false) {
-        console.error('❌ Error:', message);
+    showError(message) {
+        console.error('❌ Dashboard Error:', message);
         
-        // Create or update error display
-        let errorDiv = document.getElementById('dashboardError');
-        if (!errorDiv) {
-            errorDiv = document.createElement('div');
-            errorDiv.id = 'dashboardError';
-            errorDiv.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${isCritical ? '#ED4245' : '#FAA81A'};
-                color: white;
-                padding: 15px 20px;
-                border-radius: 8px;
-                z-index: 9999;
-                max-width: 400px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                animation: slideIn 0.3s ease;
-            `;
-            
-            const closeBtn = document.createElement('button');
-            closeBtn.innerHTML = '×';
-            closeBtn.style.cssText = `
-                background: none;
-                border: none;
-                color: white;
-                font-size: 24px;
-                cursor: pointer;
-                margin-left: 15px;
-                padding: 0;
-                width: 24px;
-                height: 24px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            `;
-            closeBtn.onclick = () => errorDiv.remove();
-            
-            errorDiv.innerHTML = `<span>${message}</span>`;
-            errorDiv.appendChild(closeBtn);
-            
-            document.body.appendChild(errorDiv);
-        } else {
-            errorDiv.querySelector('span').textContent = message;
-            errorDiv.style.background = isCritical ? '#ED4245' : '#FAA81A';
-        }
+        // Create error display
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'dashboardError';
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #ED4245;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 9999;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        `;
         
-        // Auto-remove non-critical errors
-        if (!isCritical) {
-            setTimeout(() => {
-                if (errorDiv && errorDiv.parentNode) {
-                    errorDiv.remove();
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '×';
+        closeBtn.style.cssText = `
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            margin-left: 10px;
+            padding: 0;
+            line-height: 1;
+        `;
+        closeBtn.onclick = () => errorDiv.remove();
+        
+        errorDiv.innerHTML = `<span>${message}</span>`;
+        errorDiv.appendChild(closeBtn);
+        
+        // Add CSS animation
+        if (!document.getElementById('errorStyles')) {
+            const style = document.createElement('style');
+            style.id = 'errorStyles';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
                 }
-            }, 5000);
+            `;
+            document.head.appendChild(style);
         }
+        
+        document.body.appendChild(errorDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.remove();
+            }
+        }, 5000);
     }
 
-    async fallbackMode() {
-        console.log('🔄 Entering fallback mode');
+    useFallbackData() {
+        console.log('🔄 Using fallback data...');
         
-        // Use mock data
-        this.userData = this.getFallbackUserData();
+        // Fallback user data
+        this.userData = {
+            id: 'demo_' + Date.now(),
+            username: 'DemoUser',
+            discriminator: '0001',
+            global_name: 'Demo User',
+            avatar_url: 'https://cdn.discordapp.com/embed/avatars/0.png',
+            email: 'demo@example.com'
+        };
         this.displayUserData();
         
-        this.servers = this.getMockServers();
-        this.displayServers();
+        // Fallback guilds
+        this.servers = this.getMockGuilds();
+        this.displayGuilds();
         
-        // Still try to hide loading
-        setTimeout(() => {
-            this.hideLoading();
-            
-            // Show fallback notice
-            this.showError('Connected in demo mode. API endpoints not responding.', false);
-            
-            // Add retry button
-            const retryBtn = document.createElement('button');
-            retryBtn.textContent = '🔄 Retry Connection';
-            retryBtn.style.cssText = `
-                background: #5865F2;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                cursor: pointer;
-                margin-top: 10px;
-                font-size: 12px;
-            `;
-            retryBtn.onclick = () => {
-                window.location.reload();
-            };
-            
-            const errorDiv = document.getElementById('dashboardError');
-            if (errorDiv) {
-                errorDiv.querySelector('span').appendChild(document.createElement('br'));
-                errorDiv.querySelector('span').appendChild(retryBtn);
+        // Hide loading
+        this.hideLoading();
+        
+        // Show demo notice
+        this.showError('⚠️ Connected in demo mode. Using mock data.');
+    }
+
+    getMockGuilds() {
+        return [
+            {
+                id: 'demo_1',
+                name: 'Gaming Community',
+                icon: null,
+                member_count: 2540,
+                approximate_presence_count: 720,
+                permissions: 0x20,
+                can_manage: true
+            },
+            {
+                id: 'demo_2',
+                name: 'Development Hub',
+                icon: 'development_icon',
+                icon_url: null,
+                member_count: 1280,
+                approximate_presence_count: 320,
+                permissions: 0x8,
+                can_manage: true
             }
-        }, 1000);
+        ];
     }
 }
 
-// Initialize
+// Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
-    // Add CSS for animations
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        .server-item.active {
-            background: rgba(88, 101, 242, 0.3) !important;
-        }
-    `;
-    document.head.appendChild(style);
-    
-    // Start dashboard
+    console.log('📄 DOM loaded, initializing dashboard...');
     window.dashboard = new DashboardManager();
 });
 
 // Logout function
 function logout() {
     if (confirm('Are you sure you want to logout?')) {
-        // Clear all storage
-        sessionStorage.removeItem('hm_token');
-        localStorage.removeItem('hm_token');
+        const token = localStorage.getItem('hm_token');
         
-        // Try to call logout endpoint
-        fetch('https://api-happy-production.up.railway.app/logout', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${window.dashboard?.userToken}`
-            }
-        }).finally(() => {
-            window.location.href = '/';
-        });
+        // Call logout endpoint if available
+        if (token) {
+            fetch('https://api-happy-production.up.railway.app/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }).catch(() => {
+                // Ignore errors on logout
+            });
+        }
+        
+        // Clear storage
+        localStorage.removeItem('hm_token');
+        sessionStorage.clear();
+        
+        // Redirect to home
+        window.location.href = '/';
     }
 }
 
+// Toggle switch handlers
+document.addEventListener('change', (e) => {
+    if (e.target.type === 'checkbox' && e.target.id.includes('Toggle')) {
+        const setting = e.target.id.replace('Toggle', '');
+        const value = e.target.checked;
+        
+        if (window.dashboard?.currentServer?.id) {
+            const guildId = window.dashboard.currentServer.id;
+            
+            // Send update to API
+            fetch(`https://api-happy-production.up.railway.app/api/config/${guildId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${window.dashboard.userToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    [setting]: value
+                })
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('Failed to update setting');
+                    e.target.checked = !value; // Revert on error
+                } else {
+                    console.log(`✅ Setting ${setting} updated to ${value}`);
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                e.target.checked = !value;
+            });
+        }
+        
+        console.log(`Setting ${setting} changed to: ${value}`);
+    }
+});
+
 // Debug helper
 if (window.location.search.includes('debug')) {
-    console.log('🔧 Debug mode active');
-    window.debugDashboard = {
+    console.log('🔧 Debug mode enabled');
+    
+    window.debug = {
         token: () => window.dashboard?.userToken,
         user: () => window.dashboard?.userData,
-        servers: () => window.dashboard?.servers,
+        guilds: () => window.dashboard?.servers,
         current: () => window.dashboard?.currentServer,
-        testEndpoint: async (endpoint) => {
+        testAuth: async () => {
+            const token = window.dashboard?.userToken;
+            if (!token) return 'No token';
+            
             try {
-                const response = await fetch(`https://api-happy-production.up.railway.app${endpoint}`, {
-                    headers: {
-                        'Authorization': `Bearer ${window.dashboard?.userToken}`
-                    }
+                const res = await fetch('https://api-happy-production.up.railway.app/api/auth/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
-                console.log(`Test ${endpoint}:`, response.status, await response.text());
+                return `Auth test: ${res.status} ${res.statusText}`;
             } catch (e) {
-                console.error('Test failed:', e);
+                return `Auth test failed: ${e.message}`;
+            }
+        },
+        testGuilds: async () => {
+            const token = window.dashboard?.userToken;
+            if (!token) return 'No token';
+            
+            try {
+                const res = await fetch('https://api-happy-production.up.railway.app/api/auth/guilds', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                return `Guilds test: ${res.status} ${res.statusText}`;
+            } catch (e) {
+                return `Guilds test failed: ${e.message}`;
             }
         }
     };
+    
+    console.log('Use debug.token(), debug.user(), etc. in console');
 }
