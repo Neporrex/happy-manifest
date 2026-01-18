@@ -468,6 +468,544 @@
         </footer>
     </div>
 
-    <script src="dashboard.js"></script>
+    <!-- Replace the existing <script src="dashboard.js"></script> line with this: -->
+<script>
+// =================== DASHBOARD SCRIPT ===================
+class DashboardManager {
+    constructor() {
+        this.API_BASE = 'https://api-happy-production.up.railway.app';
+        this.userToken = null;
+        this.userData = null;
+        this.servers = [];
+        this.currentServer = null;
+        
+        console.log('🚀 Dashboard initialized');
+        this.init();
+    }
+
+    async init() {
+        console.log('🔍 Starting dashboard...');
+        
+        // Get token from URL
+        this.userToken = this.getTokenFromURL();
+        console.log('🔑 Token:', this.userToken ? 'Found' : 'Missing');
+        
+        if (!this.userToken) {
+            this.showError('❌ No token found. Please login.', true);
+            setTimeout(() => window.location.href = '/', 3000);
+            return;
+        }
+
+        try {
+            // Test API connection
+            await this.testAPI();
+            
+            // Load data
+            await this.loadUserData();
+            await this.loadGuilds();
+            
+            // Success
+            this.hideLoading();
+            console.log('✅ Dashboard loaded');
+            
+        } catch (error) {
+            console.error('❌ Dashboard failed:', error);
+            this.showError('⚠️ API connection failed. Using demo mode.', false);
+            this.useDemoMode();
+        }
+    }
+
+    getTokenFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        
+        if (token) {
+            localStorage.setItem('hm_token', token);
+            return token;
+        }
+        
+        return localStorage.getItem('hm_token');
+    }
+
+    async testAPI() {
+        console.log('📡 Testing API connection...');
+        
+        // Test if API is reachable
+        try {
+            const response = await fetch(`${this.API_BASE}/`);
+            console.log('✅ API reachable:', response.status);
+            return true;
+        } catch (error) {
+            console.error('❌ API unreachable:', error);
+            throw error;
+        }
+    }
+
+    async loadUserData() {
+        console.log('👤 Loading user data...');
+        
+        try {
+            const response = await fetch(`${this.API_BASE}/api/auth/me`, {
+                headers: {
+                    'Authorization': `Bearer ${this.userToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('📊 User API:', response.status);
+            
+            if (response.ok) {
+                this.userData = await response.json();
+                console.log('✅ User loaded:', this.userData.username);
+                this.displayUserData();
+            } else {
+                throw new Error(`User API failed: ${response.status}`);
+            }
+            
+        } catch (error) {
+            console.error('Failed to load user:', error);
+            throw error;
+        }
+    }
+
+    displayUserData() {
+        const userName = document.getElementById('userName');
+        const userEmail = document.getElementById('userEmail');
+        const userAvatar = document.getElementById('userAvatar');
+
+        if (!userName || !userAvatar) {
+            console.error('❌ DOM elements missing');
+            return;
+        }
+
+        if (this.userData) {
+            // Format name
+            const displayName = this.userData.global_name || 
+                               this.userData.username || 
+                               'Discord User';
+            const discriminator = this.userData.discriminator ? 
+                                 `#${this.userData.discriminator}` : '';
+            
+            userName.textContent = `${displayName}${discriminator}`;
+            
+            // Email
+            if (userEmail) {
+                userEmail.textContent = this.userData.email || displayName;
+            }
+            
+            // Avatar
+            let avatarUrl = 'https://cdn.discordapp.com/embed/avatars/0.png';
+            if (this.userData.avatar && this.userData.id) {
+                avatarUrl = `https://cdn.discordapp.com/avatars/${this.userData.id}/${this.userData.avatar}.png?size=256`;
+            }
+            
+            userAvatar.innerHTML = `
+                <img src="${avatarUrl}" 
+                     alt="${displayName}" 
+                     style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;"
+                     onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'; this.style.opacity='0.8'">
+            `;
+        }
+    }
+
+    async loadGuilds() {
+        console.log('🏰 Loading guilds...');
+        
+        try {
+            const response = await fetch(`${this.API_BASE}/api/auth/guilds`, {
+                headers: {
+                    'Authorization': `Bearer ${this.userToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('📊 Guilds API:', response.status);
+            
+            if (response.ok) {
+                const guilds = await response.json();
+                console.log(`✅ ${guilds.length} guilds loaded`);
+                
+                // Filter manageable guilds
+                this.servers = guilds.filter(g => {
+                    const perms = parseInt(g.permissions || '0');
+                    return (perms & 0x8) || (perms & 0x20) || g.owner;
+                });
+                
+                this.displayGuilds();
+            } else {
+                throw new Error(`Guilds API failed: ${response.status}`);
+            }
+            
+        } catch (error) {
+            console.error('Failed to load guilds:', error);
+            this.servers = this.getDemoGuilds();
+            this.displayGuilds();
+        }
+    }
+
+    displayGuilds() {
+        const serversList = document.getElementById('serversList');
+        if (!serversList) {
+            console.error('❌ serversList missing');
+            return;
+        }
+        
+        serversList.innerHTML = '';
+        
+        if (this.servers.length === 0) {
+            serversList.innerHTML = `
+                <div style="text-align: center; padding: 30px; color: #888;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">🏰</div>
+                    <p>No servers to manage</p>
+                    <small style="font-size: 12px; opacity: 0.7;">
+                        You need "Manage Server" permission
+                    </small>
+                </div>
+            `;
+            return;
+        }
+        
+        console.log(`🖼️ Displaying ${this.servers.length} guilds`);
+        
+        this.servers.forEach((guild, index) => {
+            const element = this.createGuildElement(guild, index === 0);
+            serversList.appendChild(element);
+        });
+        
+        // Select first guild
+        if (this.servers.length > 0) {
+            setTimeout(() => this.selectGuild(this.servers[0]), 100);
+        }
+    }
+
+    createGuildElement(guild, isActive = false) {
+        const element = document.createElement('div');
+        element.className = 'server-item';
+        element.dataset.guildId = guild.id;
+        
+        // Base styling
+        element.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 6px;
+            transition: all 0.2s;
+            background: ${isActive ? 'rgba(88, 101, 242, 0.3)' : 'transparent'};
+        `;
+        
+        if (isActive) {
+            element.classList.add('active');
+        }
+        
+        // Guild icon
+        let iconHTML = '🏠';
+        if (guild.icon) {
+            iconHTML = `
+                <img src="https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png" 
+                     alt="${guild.name}"
+                     style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;"
+                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\"width: 40px; height: 40px; border-radius: 50%; background: #2f3136; display: flex; align-items: center; justify-content: center; font-size: 20px;\">🏠</div>'">
+            `;
+        }
+        
+        // Owner badge
+        const ownerBadge = guild.owner ? '<span style="font-size: 11px; color: #57F287; margin-left: 4px;">(Owner)</span>' : '';
+        
+        element.innerHTML = `
+            <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; 
+                        display: flex; align-items: center; justify-content: center; 
+                        background: #2f3136; flex-shrink: 0;">
+                ${iconHTML}
+            </div>
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 500; font-size: 14px; overflow: hidden; 
+                            text-overflow: ellipsis; white-space: nowrap;">
+                    ${guild.name}${ownerBadge}
+                </div>
+                <div style="font-size: 11px; color: #888; margin-top: 2px;">
+                    ${guild.permissions ? 'Manage Permission' : 'Member'}
+                </div>
+            </div>
+            <div style="color: #57F287; font-size: 12px; flex-shrink: 0;" title="Bot is in this server">
+                ✓
+            </div>
+        `;
+        
+        // Click handler
+        element.addEventListener('click', () => {
+            // Remove active from all
+            document.querySelectorAll('.server-item').forEach(item => {
+                item.classList.remove('active');
+                item.style.background = 'transparent';
+            });
+            
+            // Add to clicked
+            element.classList.add('active');
+            element.style.background = 'rgba(88, 101, 242, 0.3)';
+            
+            this.selectGuild(guild);
+        });
+        
+        // Hover effects
+        element.onmouseenter = () => {
+            if (!element.classList.contains('active')) {
+                element.style.background = 'rgba(79, 84, 92, 0.2)';
+            }
+        };
+        element.onmouseleave = () => {
+            if (!element.classList.contains('active')) {
+                element.style.background = 'transparent';
+            }
+        };
+        
+        return element;
+    }
+
+    selectGuild(guild) {
+        console.log('🎯 Selected guild:', guild.name);
+        this.currentServer = guild;
+        
+        // Update UI
+        const noServer = document.getElementById('noServerSelected');
+        const content = document.getElementById('serverContent');
+        
+        if (noServer) noServer.style.display = 'none';
+        if (content) content.style.display = 'block';
+        
+        // Update stats
+        this.updateStats(guild);
+        
+        // Load guild config
+        this.loadGuildConfig(guild.id);
+    }
+
+    updateStats(guild) {
+        const memberCount = document.getElementById('memberCount');
+        const onlineCount = document.getElementById('onlineCount');
+        
+        if (memberCount) {
+            memberCount.textContent = '2,540';
+        }
+        if (onlineCount) {
+            onlineCount.textContent = '720';
+        }
+    }
+
+    async loadGuildConfig(guildId) {
+        console.log(`⚙️ Loading config for ${guildId}...`);
+        
+        try {
+            const response = await fetch(`${this.API_BASE}/api/config/${guildId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.userToken}`
+                }
+            });
+            
+            if (response.ok) {
+                const config = await response.json();
+                this.applyConfig(config);
+            }
+        } catch (error) {
+            console.log('⚠️ Config load failed:', error);
+        }
+    }
+
+    applyConfig(config) {
+        console.log('⚙️ Applying config...');
+        
+        // Map config to toggles
+        const toggleMap = {
+            welcome_enabled: 'welcomeToggle',
+            log_enabled: 'moderationToggle',
+            ticket_enabled: 'musicToggle'
+        };
+        
+        Object.entries(toggleMap).forEach(([key, toggleId]) => {
+            const toggle = document.getElementById(toggleId);
+            if (toggle && config[key] !== undefined) {
+                toggle.checked = Boolean(config[key]);
+            }
+        });
+    }
+
+    hideLoading() {
+        const loading = document.getElementById('loadingOverlay');
+        const dashboard = document.getElementById('dashboardContainer');
+        
+        if (loading) {
+            loading.style.opacity = '0';
+            loading.style.transition = 'opacity 0.5s';
+            setTimeout(() => {
+                loading.style.display = 'none';
+                if (dashboard) {
+                    dashboard.style.display = 'block';
+                    setTimeout(() => {
+                        dashboard.style.opacity = '1';
+                    }, 10);
+                }
+            }, 500);
+        }
+    }
+
+    useDemoMode() {
+        console.log('🔄 Using demo mode');
+        
+        // Demo user
+        this.userData = {
+            username: 'DemoUser',
+            discriminator: '0001',
+            global_name: 'Demo User',
+            email: 'demo@example.com'
+        };
+        this.displayUserData();
+        
+        // Demo guilds
+        this.servers = this.getDemoGuilds();
+        this.displayGuilds();
+        
+        // Hide loading
+        this.hideLoading();
+    }
+
+    getDemoGuilds() {
+        return [
+            {
+                id: 'demo_1',
+                name: 'Gaming Community',
+                icon: null,
+                owner: true,
+                permissions: '8'
+            },
+            {
+                id: 'demo_2',
+                name: 'Developer Hub',
+                icon: 'abc123',
+                owner: false,
+                permissions: '2147483647'
+            }
+        ];
+    }
+
+    showError(message, isCritical = false) {
+        console.error('❌ Error:', message);
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${isCritical ? '#ED4245' : '#FAA81A'};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 9999;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
+        `;
+        
+        errorDiv.innerHTML = `
+            <strong>${isCritical ? 'Error' : 'Warning'}</strong>
+            <p style="margin: 5px 0 0 0; font-size: 14px;">${message}</p>
+            <button onclick="this.parentElement.remove()" 
+                    style="position: absolute; top: 5px; right: 5px; 
+                           background: none; border: none; color: white; 
+                           cursor: pointer; font-size: 20px; padding: 0;">×</button>
+        `;
+        
+        document.body.appendChild(errorDiv);
+        
+        // Add animation CSS
+        if (!document.querySelector('#error-animation')) {
+            const style = document.createElement('style');
+            style.id = 'error-animation';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Auto-remove
+        if (!isCritical) {
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, 5000);
+        }
+    }
+}
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('📄 DOM loaded');
+    window.dashboard = new DashboardManager();
+});
+
+// Logout function
+function logout() {
+    if (confirm('Are you sure you want to logout?')) {
+        const token = localStorage.getItem('hm_token');
+        
+        // Clear storage
+        localStorage.removeItem('hm_token');
+        sessionStorage.clear();
+        
+        // Optional: Call logout endpoint
+        if (token) {
+            fetch('https://api-happy-production.up.railway.app/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }).catch(() => {
+                // Ignore errors
+            });
+        }
+        
+        // Redirect
+        window.location.href = '/';
+    }
+}
+
+// Toggle switch handler
+document.addEventListener('change', (e) => {
+    if (e.target.type === 'checkbox' && e.target.id.includes('Toggle')) {
+        const setting = e.target.id.replace('Toggle', '');
+        const value = e.target.checked;
+        const guildId = window.dashboard?.currentServer?.id;
+        const token = window.dashboard?.userToken;
+        
+        if (guildId && token) {
+            console.log(`🔄 Updating ${setting} to ${value} for guild ${guildId}`);
+            
+            // Send to API
+            fetch(`https://api-happy-production.up.railway.app/api/config/${guildId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    [setting]: value
+                })
+            }).then(response => {
+                if (!response.ok) {
+                    console.error('Failed to update setting');
+                    e.target.checked = !value;
+                }
+            }).catch(() => {
+                e.target.checked = !value;
+            });
+        }
+    }
+});
+</script>
 </body>
 </html>
